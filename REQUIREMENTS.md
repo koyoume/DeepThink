@@ -1,0 +1,103 @@
+# DeepThink 웹 이식 — 요구사항 (누적)
+> 정본은 코드(특히 `android-backup/app/src/main/java/com/printk/deepthink/`). 이 문서는 그 위에 얹는 웹 이식 결정·적응 사항을 담는다.
+
+## 1. 단위/용어
+- **주제(Topic)**: 핵심 단위, 하나의 카테고리에 속함
+- **생각(Thought)**: 주제 안의 한 줄, `check`(체크리스트) 또는 `comment`(코멘트) 타입, `level`(들여쓰기, 0~4)
+- **자료(Material)**: 주제에 딸린 선택적 관련 자료, `link` 또는 `doc`
+- **카테고리(Category)**: vault 안 md 파일 1개에 대응
+
+## 2. 데이터 모델
+Android `Models.kt` 기준 1:1:
+```ts
+type ThoughtType = 'check' | 'comment'
+type MaterialKind = 'link' | 'doc'
+const MAX_THOUGHT_LEVEL = 4
+
+interface Thought {
+  id: string
+  type: ThoughtType
+  level: number       // 0-4
+  text: string
+  done: boolean       // check 타입에서만 의미
+}
+
+interface Material {
+  kind: MaterialKind
+  title: string
+  sub: string
+  url: string
+}
+
+interface Topic {
+  id: string
+  category: string
+  title: string
+  materials: Material[]
+  thoughts: Thought[]
+}
+
+interface Category {
+  name: string
+  order: number
+}
+```
+
+## 3. Markdown 포맷 (round-trip 보장, `MarkdownCodec.kt` 이식)
+```
+# <카테고리>
+
+<!-- topic: <uuid> -->
+## <제목>
+
+### 관련 자료
+- [link](url) "title" — sub
+- [doc] "title" — sub
+
+### 생각
+- [ ] 미완료 체크 (level0)
+- [x] 완료 체크
+  - [ ] 하위 체크 (들여쓰기 2칸 = level+1)
+- 코멘트 한 줄
+```
+- 레벨당 들여쓰기 2칸.
+- 파싱 시 알 수 없는 줄은 무시(원본과 동일 관용).
+- Material 파싱: `[link](url)` 또는 `[doc]` 뒤에 `"title"`(따옴표 필수 파싱) + 선택적 ` — sub`.
+
+## 4. 저장/동기화
+- 파일 레이아웃: `<repoDir>/DeepThink/<slug(카테고리)>.md`, 순서 메타 `<repoDir>/DeepThink/.deepthink/categories.json`.
+- slug 규칙: `[/\:*?"<>|]` → `_`, 빈 문자열이면 `untitled`.
+- git 동기화는 **카테고리별로 해당 md 파일 1개만** add/commit/push — repo의 다른 파일은 절대 건드리지 않음(원본 불변 조건 유지).
+- **PAT 저장**: `localStorage`에 평문 저장(remoteUrl/username/token/authorName/authorEmail). Android의 EncryptedSharedPreferences 같은 안전한 저장소가 브라우저엔 없음 — 개인용 도구라는 전제 하의 의도적 트레이드오프. **정정 여지**: 나중에 passphrase 기반 Web Crypto 암호화를 추가할 수 있음(현재 범위 아님).
+- **CORS 프록시**: git 호스트가 브라우저 CORS를 지원하지 않아 Cloudflare Worker로 투명 프록시 필요(git 로직에 관여하지 않는 순수 바이트 릴레이).
+
+## 5. 화면/기능별 스펙
+`docs/legacy-prototype/UI-DESIGN.md` §4~6 동작 스펙을 그대로 따름(시각 디자인은 새로 함):
+- **대시보드**: 카테고리 칩(단일·필수 선택, "전체" 없음), 주제 카드 2열(제목 자동축소 18px→11px, 미리보기 N줄, 메이슨리), 뷰옵션 버튼(3→2→1→끔→3 순환), FAB로 주제 추가.
+- **상세 화면**: 제목 고정 높이 박스(짧으면 27px 한 줄, 길면 22px→15px 두 줄), 관련자료 리스트(선택), 생각 리스트, 하단 입력바.
+- **편집 인터랙션** (원본은 터치 전용 → 웹은 아래 모두 지원):
+  | 동작 | 원본(터치) | 웹 추가 지원 |
+  |---|---|---|
+  | 줄 편집 | 탭 | 클릭 |
+  | 줄 추가/삽입 | 편집 중 Enter | 동일 |
+  | 입력 종료 | 빈 줄 Enter | 동일 |
+  | 줄 삭제 | 빈 줄 맨앞 Backspace | 동일 |
+  | 들여쓰기 | 오른쪽 스와이프 | + Tab, + ⋯메뉴 |
+  | 내어쓰기 | 왼쪽 스와이프 | + Shift+Tab, + ⋯메뉴 |
+  | 완료 토글 | 체크 아이콘 탭 | 클릭 |
+  | 줄 메뉴 | 길게 누르기(~480ms) | + 줄별 "⋯" 버튼 클릭 |
+- **들여쓰기 규칙** (`TopicDetailViewModel.shiftLevel` 기준): 들여쓰기 시 상한 = `min(바로 위 줄 level+1, MAX_THOUGHT_LEVEL)`, 내어쓰기 시 하한 0. 대상 줄 이후 `level > 현재 level`인 연속 줄들(하위 트리)이 함께 이동.
+- **설정 화면**: git 원격 URL/username/token/author 설정, 미리보기 기본 줄 수(0~3).
+
+## 6. 비기능 요구
+- 반응형: 데스크톱/모바일 브라우저 모두 대응(원본은 모바일 전용이었으나 웹은 양쪽 지원).
+- 편집 후 400ms debounce 저장 (원본 `TopicDetailViewModel.scheduleSave` 동일 패턴).
+
+## 7. 범위 제외 (Non-Goals)
+- PWA/오프라인 지원
+- Android `migrateLegacyRootFiles()` 레거시 마이그레이션 로직
+- PAT 암호화 저장(향후 개선 후보)
+- 검색 기능 구체 동작(추후 정의)
+
+## 8. 구현 메모 (실제 코딩하며 발견/정정한 것)
+- (아직 없음 — P1부터 채워나감)
