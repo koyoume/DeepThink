@@ -31,10 +31,10 @@
 ## 3. 단계별 작업 (체크리스트)
 - [x] P0-1 · Android 코드 `android-backup/`로 이동, UI 문서 `docs/legacy-prototype/`로 이동 — 확인: `ls` 결과로 루트 정리됨
 - [x] P0-2 · Vite+React+TS+Tailwind 스캐폴드 (`npm run build`, dev server 200 확인)
-- [ ] P0-3 · PLAN.md/REQUIREMENTS.md 작성 (본 문서)
-- [ ] P0-4 · git init + 초기 커밋
-- [ ] P1 · 도메인 로직 포팅: `models.ts`, `markdownCodec.ts`, golden-case 검증 스크립트 (`MarkdownCodecTest.kt` 4개 케이스 이식)
-- [ ] P1 · `vaultStore.ts` (LightningFS 기반, `VaultFileStore.kt` 레이아웃 1:1)
+- [x] P0-3 · PLAN.md/REQUIREMENTS.md 작성 (본 문서)
+- [x] P0-4 · git init + 초기 커밋 (`e3d06a0`)
+- [x] P1 · 도메인 로직 포팅: `models.ts`, `markdownCodec.ts`, golden-case 검증 스크립트 (`MarkdownCodecTest.kt` 4개 케이스 이식) — `npm run verify:domain` 통과
+- [x] P1 · `vaultStore.ts` (LightningFS 기반, `VaultFileStore.kt` 레이아웃 1:1) — fake-indexeddb로 Node에서 round-trip/순서/삭제 검증
 - [ ] P2 · `gitSync.ts` (isomorphic-git, 카테고리별 md 1개만 commit/push)
 - [ ] P2 · Cloudflare Worker CORS 프록시 작성/배포
 - [ ] P2 · `settingsStore.ts` (GitConfig, previewLines)
@@ -55,4 +55,4 @@
 - Cloudflare Worker 프록시의 실제 URL/배포 계정 확정 (P2에서)
 
 ## 6. 세션 이력 (진행 로그)
-- **2026-07-05 (세션 1)**: 웹 이식 킥오프. 핵심 결정 3가지 확인(클라이언트 사이드 git, 저장소 재구성, 새 UI 디자인). 계획 승인 후 P0 착수 — Android 코드 `android-backup/`, UI 문서 `docs/legacy-prototype/`로 이동, Vite+React+TS+Tailwind 스캐폴드 완료(build/dev 확인).
+- **2026-07-05 (세션 1)**: 웹 이식 킥오프. 핵심 결정 3가지 확인(클라이언트 사이드 git, 저장소 재구성, 새 UI 디자인). 계획 승인 후 P0 착수 — Android 코드 `android-backup/`, UI 문서 `docs/legacy-prototype/`로 이동, Vite+React+TS+Tailwind 스캐폴드 완료(build/dev 확인). 이어서 P1 도메인 로직 포팅: `models.ts`/`markdownCodec.ts`(Kotlin 4개 golden case 이식, round-trip 통과), `vaultStore.ts`(LightningFS, fake-indexeddb로 Node에서 검증). `enum` 대신 문자열 유니온 사용(tsconfig `erasableSyntaxOnly` 때문에 enum·parameter property 문법 모두 컴파일 에러 — Node 네이티브 TS 실행과 궁합 좋게 순수 타입 주석만 쓰도록 함).

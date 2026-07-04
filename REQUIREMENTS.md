@@ -100,4 +100,6 @@ interface Category {
 - 검색 기능 구체 동작(추후 정의)
 
 ## 8. 구현 메모 (실제 코딩하며 발견/정정한 것)
-- (아직 없음 — P1부터 채워나감)
+- `tsconfig.app.json`에 `erasableSyntaxOnly: true`가 켜져 있어(Node 네이티브 TS 실행 호환 목적) TypeScript `enum`과 생성자 parameter property(`constructor(private readonly x: T)`) 문법을 못 씀 — 컴파일 에러(TS1294). `markdownCodec.ts`의 Section은 문자열 유니온으로, `vaultStore.ts`의 `VaultFileStore` 생성자는 일반 필드 할당으로 작성.
+- `node`으로 `.ts` 파일을 직접 실행할 때 상대 import는 확장자(`./models.ts`)를 명시해야 함 — Vite bundler 모드(`allowImportingTsExtensions`)와도 호환되므로 도메인 레이어 전체에 이 컨벤션 사용.
+- `@isomorphic-git/lightning-fs`는 브라우저 IndexedDB 전제라 Node에서 직접 검증하려면 `fake-indexeddb` 폴리필이 필요(devDependency로 추가, 프로덕션 번들엔 포함 안 됨). 폴리필이 타이머를 남겨 스크립트가 안 끝나는 문제가 있어 검증 스크립트 끝에 `process.exit(0)` 추가.
