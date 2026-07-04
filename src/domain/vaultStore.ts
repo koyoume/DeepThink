@@ -95,11 +95,13 @@ export class VaultFileStore {
   async writeCategory(name: string, topics: Topic[]): Promise<void> {
     await this.ensureDirs()
     await this.fs.promises.writeFile(this.categoryFile(name), serializeCategory(name, topics), 'utf8')
+    await this.fs.promises.flush()
   }
 
   async deleteCategoryFile(name: string): Promise<void> {
     try {
       await this.fs.promises.unlink(this.categoryFile(name))
+      await this.fs.promises.flush()
     } catch (err) {
       if (!isNotFound(err)) throw err
     }
@@ -131,5 +133,6 @@ export class VaultFileStore {
   async writeOrder(names: string[]): Promise<void> {
     await this.ensureDirs()
     await this.fs.promises.writeFile(this.orderFile, JSON.stringify(names, null, 2), 'utf8')
+    await this.fs.promises.flush()
   }
 }

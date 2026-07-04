@@ -9,6 +9,7 @@ import type { GitConfig } from '../git/gitSync.ts'
 
 const STORAGE_KEY = 'deepthink.gitConfig'
 const PREVIEW_LINES_KEY = 'deepthink.previewLines'
+const CORS_PROXY_KEY = 'deepthink.corsProxy'
 
 const DEFAULT_GIT_CONFIG: GitConfig = {
   remoteUrl: '',
@@ -44,4 +45,13 @@ export function getPreviewLines(): number {
 
 export function setPreviewLines(value: number): void {
   localStorage.setItem(PREVIEW_LINES_KEY, String(Math.min(Math.max(value, 0), 3)))
+}
+
+/** 웹 전용 추가 설정 — GitHub 등은 브라우저 CORS를 지원하지 않아 프록시가 필요하다 (REQUIREMENTS.md §4) */
+export function getCorsProxy(): string {
+  return localStorage.getItem(CORS_PROXY_KEY) ?? ''
+}
+
+export function setCorsProxy(url: string): void {
+  localStorage.setItem(CORS_PROXY_KEY, url.trim())
 }
