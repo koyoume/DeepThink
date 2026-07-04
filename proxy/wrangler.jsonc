@@ -2,7 +2,7 @@
   "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "deepthink-git-proxy",
   "main": "src/worker.js",
-  "compatibility_date": "2026-07-05",
+  "compatibility_date": "2026-07-04",
   "vars": {
     "ALLOWED_HOSTS": "github.com,gitlab.com,bitbucket.org"
   },
