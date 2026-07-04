@@ -1,4 +1,5 @@
 import type LightningFS from '@isomorphic-git/lightning-fs'
+import { ensureDir, isNotFound } from './fsUtil.ts'
 import { parseCategory, serializeCategory, type ParsedCategory } from './markdownCodec.ts'
 import type { Topic } from './models.ts'
 
@@ -20,30 +21,9 @@ import type { Topic } from './models.ts'
 const DATA_SUBDIR = 'DeepThink'
 const META_DIR = '.deepthink'
 
-function isNotFound(err: unknown): boolean {
-  return (err as { code?: string } | null)?.code === 'ENOENT'
-}
-
-function isAlreadyExists(err: unknown): boolean {
-  return (err as { code?: string } | null)?.code === 'EEXIST'
-}
-
 function slug(name: string): string {
   const cleaned = name.trim().replace(/[/\\:*?"<>|]/g, '_')
   return cleaned.length > 0 ? cleaned : 'untitled'
-}
-
-async function ensureDir(fs: LightningFS, dirPath: string): Promise<void> {
-  const parts = dirPath.split('/').filter((p) => p.length > 0)
-  let cur = ''
-  for (const part of parts) {
-    cur += `/${part}`
-    try {
-      await fs.promises.mkdir(cur)
-    } catch (err) {
-      if (!isAlreadyExists(err)) throw err
-    }
-  }
 }
 
 export class VaultFileStore {

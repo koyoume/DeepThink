@@ -20,13 +20,24 @@
 ```
 /                        ← 웹 프로젝트 루트 (Vite)
   src/
-    domain/              ← 순수 도메인 로직 (models, markdownCodec, vaultStore)
-    ...                  ← (P3에서 컴포넌트/스토어 추가 예정)
+    domain/              ← 순수 도메인 로직 (models, markdownCodec, vaultStore, fsUtil)
+    git/                 ← gitSync.ts (isomorphic-git 래퍼) + __verify__/liveSync.mjs
+    settings/            ← settingsStore.ts (localStorage: GitConfig, previewLines)
+    ...                  ← (P3에서 컴포넌트/UI 스토어 추가 예정)
+  proxy/                 ← 별도 소규모 프로젝트: Cloudflare Worker CORS 릴레이 프록시
+    src/worker.js
+    wrangler.jsonc
   android-backup/        ← 기존 Android(Kotlin+Compose) 앱 전체 (참고용, 더 이상 유지보수 안 함)
   docs/legacy-prototype/ ← UI-DESIGN.md, thoughts-prototype.html (동작 스펙 참고, 정본 아님)
   WEB_DEV_GUIDE.md        ← 웹 개발 워크플로 가이드
   PLAN.md / REQUIREMENTS.md
 ```
+
+## 2.1 Cloudflare Worker CORS 프록시 배포 (사용자 수동 작업 필요)
+1. `cd proxy && npx wrangler login` (Cloudflare 계정 로그인 — 이 부분은 에이전트가 대신 못 함)
+2. `npm run deploy` → 배포된 `*.workers.dev` URL 확인
+3. 그 URL을 웹 앱 설정(Settings 화면, P3에서 구현)의 `corsProxy` 값으로 입력
+4. `ALLOWED_HOSTS`(wrangler.jsonc의 vars)는 기본 `github.com,gitlab.com,bitbucket.org` — 다른 호스트 쓰면 이 값 수정 후 재배포
 
 ## 3. 단계별 작업 (체크리스트)
 - [x] P0-1 · Android 코드 `android-backup/`로 이동, UI 문서 `docs/legacy-prototype/`로 이동 — 확인: `ls` 결과로 루트 정리됨
@@ -35,10 +46,10 @@
 - [x] P0-4 · git init + 초기 커밋 (`e3d06a0`)
 - [x] P1 · 도메인 로직 포팅: `models.ts`, `markdownCodec.ts`, golden-case 검증 스크립트 (`MarkdownCodecTest.kt` 4개 케이스 이식) — `npm run verify:domain` 통과
 - [x] P1 · `vaultStore.ts` (LightningFS 기반, `VaultFileStore.kt` 레이아웃 1:1) — fake-indexeddb로 Node에서 round-trip/순서/삭제 검증
-- [ ] P2 · `gitSync.ts` (isomorphic-git, 카테고리별 md 1개만 commit/push)
-- [ ] P2 · Cloudflare Worker CORS 프록시 작성/배포
-- [ ] P2 · `settingsStore.ts` (GitConfig, previewLines)
-- [ ] P2 · 실제 GitHub repo로 clone→push→pull 수동 검증
+- [x] P2 · `gitSync.ts` (isomorphic-git, 카테고리별 md 1개만 commit/push) — `tsc` 통과, 로직은 JGitClient.kt/GitSyncRepositoryImpl.kt 1:1
+- [x] P2 · Cloudflare Worker CORS 프록시 작성 (`proxy/`) — `wrangler deploy --dry-run` 통과. **실제 배포는 사용자가 `wrangler login` 후 `npm run deploy` 필요** (계정 로그인 필요, 이 세션에서 대신 못 함)
+- [x] P2 · `settingsStore.ts` (GitConfig, previewLines) — localStorage
+- [ ] P2 · 실제 GitHub repo로 clone→push→pull 수동 검증 — **보류**(사용자 선택: 지금은 건너뛰고 코드 리뷰만). `npm run verify:git`에 env var(`GIT_VERIFY_REMOTE_URL`/`GIT_VERIFY_TOKEN`) 설정 후 준비되면 재개. P3에서 실제 브라우저 UI로 사용하며 검증하는 경로도 가능.
 - [ ] P3 · Dashboard 화면 (카테고리 칩, 카드 그리드, 뷰옵션, FAB)
 - [ ] P3 · Topic Detail 화면 (제목 박스, 관련자료, 생각 리스트, 입력바)
 - [ ] P3 · Settings 화면
@@ -56,3 +67,4 @@
 
 ## 6. 세션 이력 (진행 로그)
 - **2026-07-05 (세션 1)**: 웹 이식 킥오프. 핵심 결정 3가지 확인(클라이언트 사이드 git, 저장소 재구성, 새 UI 디자인). 계획 승인 후 P0 착수 — Android 코드 `android-backup/`, UI 문서 `docs/legacy-prototype/`로 이동, Vite+React+TS+Tailwind 스캐폴드 완료(build/dev 확인). 이어서 P1 도메인 로직 포팅: `models.ts`/`markdownCodec.ts`(Kotlin 4개 golden case 이식, round-trip 통과), `vaultStore.ts`(LightningFS, fake-indexeddb로 Node에서 검증). `enum` 대신 문자열 유니온 사용(tsconfig `erasableSyntaxOnly` 때문에 enum·parameter property 문법 모두 컴파일 에러 — Node 네이티브 TS 실행과 궁합 좋게 순수 타입 주석만 쓰도록 함).
+  이어서 P2: `gitSync.ts`(isomorphic-git, JGitClient.kt/GitSyncRepositoryImpl.kt 로직 1:1), `settingsStore.ts`, Cloudflare Worker CORS 프록시(`proxy/`, `wrangler deploy --dry-run` 통과). 실제 GitHub 왕복 검증은 PAT가 필요해 사용자 선택으로 **보류**(추후 `npm run verify:git` 또는 P3 UI에서 실사용하며 검증) — `gitSync.ts`는 타입체크만 통과한 상태로 다음 단계 진행.
