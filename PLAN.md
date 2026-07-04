@@ -1,5 +1,5 @@
 # DeepThink 웹 이식 — 계획·진행 현황
-> 상태: P0~P5 골격 완료, 사용자 쪽 계정/시크릿 설정 대기 · 최종 갱신 2026-07-05
+> 상태: P0~P5 완료, 배포 파이프라인 실가동 중 (Pages+프록시 Worker 모두 라이브) · 최종 갱신 2026-07-04
 
 ## 1. 확정된 결정
 | 항목 | 결정 | 비고 |
@@ -41,11 +41,12 @@
 - **Cloudflare Pages 프로젝트 생성 완료**: `deepthink` — production URL `https://deepthink-4rb.pages.dev/` (200 확인).
 - **웹 앱 1차 수동 배포 완료**: `wrangler pages deploy ./dist --project-name deepthink --branch main`으로 확인.
 - **GitHub repo Secrets 등록 완료**: `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_API_TOKEN` (Cloudflare API로 유효성 확인 완료, Pages 배포로 권한도 확인). 이제 `main` push 시 `.github/workflows/deploy.yml`이 실제로 동작할 수 있는 상태.
-- **프록시 Worker 배포는 아직 막힘**: `WEB_DEV_GUIDE.md` §6.2가 미리 경고한 workers.dev 서브도메인 미등록 문제 실제로 재현됨. **사용자가 아래 URL에서 1회 등록해야 함** (에이전트가 대신 못 함):
-  ```
-  https://dash.cloudflare.com/3ca03344b97f1c5f0b0ef81347b4cfca/workers/onboarding
-  ```
-  등록 후 `cd proxy && npm run deploy`로 재시도. 배포되면 그 `*.workers.dev` URL을 웹 앱 Settings 화면의 `corsProxy` 값으로 입력.
+- **프록시 Worker 배포 완료**: `https://deepthink-git-proxy.koyoume.workers.dev` — 대시보드 URL이 안 열려서, Cloudflare API(`PUT /accounts/{id}/workers/subdomain`, wrangler의 기존 OAuth 세션 토큰 사용)로 `koyoume.workers.dev` 서브도메인을 직접 등록 후 배포. 배포 직후 몇 분간 TLS 인증서 전파 대기 필요했음(핸드셰이크 실패 → 자동 해결). 스모크 테스트 전부 통과:
+  - `/` (호스트 없음) → 403 (오픈릴레이 방지 정상)
+  - `/github.com/octocat/Hello-World.git/info/refs?service=git-upload-pack` → 200, `content-type: application/x-git-upload-pack-advertisement`, CORS 헤더 포함
+  - `/evil.example.com/...` → 403 (ALLOWED_HOSTS 화이트리스트 정상)
+  - OPTIONS preflight → 204
+  이 URL을 웹 앱 Settings 화면의 `corsProxy` 값으로 입력하면 실사용 가능.
 - `compatibility_date`가 실제 배포 중 "미래 날짜" 에러로 거부됨(세션에 주입된 로컬 날짜가 UTC보다 하루 앞섬) — `2026-07-04`로 수정, 커밋 `190ca94`.
 
 ## 3. 단계별 작업 (체크리스트)
@@ -74,8 +75,7 @@
 - 검색 동작 정의 (UI-DESIGN.md TODO에서 이월, 아직 미구현)
 - 카테고리 색상 커스터마이징 (추가/이름변경/삭제는 Settings 화면에 구현됨, 색은 없음)
 - 관련 자료 추가 UI (표시/삭제는 구현, 새로 추가하는 입력 폼은 없음)
-- Cloudflare Worker 프록시 실제 배포 (§2.1, 사용자가 `wrangler login` 필요)
-- 프록시 Worker workers.dev 서브도메인 등록 (§2.1, 사용자가 대시보드에서 1회 등록 필요 — 유일하게 남은 배포 블로커)
+- 웹 앱 Settings 화면에 프록시 URL(`https://deepthink-git-proxy.koyoume.workers.dev`) 입력해서 실사용 테스트 (배포 자체는 완료)
 - 실제 GitHub 저장소로 clone/push/pull 왕복 검증 (P2에서 PAT 없어 보류, `npm run verify:git` 또는 실사용 중 확인)
 
 ## 6. 세션 이력 (진행 로그)
@@ -84,4 +84,5 @@
   이어서 P3: Zustand store(`vaultStore.ts`/`gitStore.ts`) + 3개 화면(Dashboard/TopicDetail/Settings) 구현, 새 Tailwind 디자인. Playwright(Chromium)를 설치해 실브라우저로 직접 검증하다가 **실버그 발견**: LightningFS가 IndexedDB 저장을 500ms 디바운스하는데 우리 앱은 그걸 모르고 있었음 — 편집 후 곧장 새로고침하면 데이터가 유실될 수 있는 창이 있었음. `VaultFileStore`의 write 계열 메서드(`writeCategory`/`deleteCategoryFile`/`writeOrder`) 끝에 `fs.promises.flush()`를 추가해 즉시 영속되도록 수정, Playwright로 새로고침 후 데이터 유지 확인 완료.
   이어서 P4: `.github/workflows/deploy.yml`(npm ci→verify:domain→build→E2E게이트→wrangler pages deploy) + `deploy-proxy.yml`(proxy/ 변경 시에만) 작성. 이 repo는 아직 GitHub remote가 없어 실제 실행은 안 됨 — §2.2에 사용자가 해야 할 준비(remote 연결, Pages 프로젝트 생성, GitHub Secrets 등록) 정리.
   이어서 P5: Playwright 설정(`playwright.config.ts`, `vite preview`로 실제 프로덕션 빌드 대상) + `e2e/dashboard-flow.spec.ts`(P3에서 수기로 검증했던 시나리오를 정식 테스트로 포맷 — 대시보드 로드, 상세 진입/제목 수정, 입력바로 생각 추가, Tab 들여쓰기, 뒤로가기+새로고침 영속, 설정 화면+브라우저 뒤로가기). `npm run build && npm run test:e2e` 로컬 통과 확인 — 이제 §P0~P5 전체 골격 완료, 남은 건 사용자 쪽 계정/시크릿 설정(§2.1, §2.2)과 실제 GitHub 왕복 검증(§P2 보류 항목).
-- **2026-07-04 (세션 2)**: 배포 파이프라인 실제 가동. 원격 저장소는 `https://github.com/koyoume/DeepThink`(사용자가 사전에 만들어둔 빈 repo, 세션 1 때는 로컬에 `.git`이 없어서 몰랐음 — "기존 repo 대체"가 이 repo를 의미했던 것으로 뒤늦게 확인). 사용자가 GitHub PAT를 채팅에 두 번(대소문자 오타 포함) 직접 붙여넣어 push 완료 — **경고했지만 사용자가 그대로 진행을 선택**함, 폐기/재발급 권고함. 이후 `gh` CLI가 이미 이 계정으로 인증돼 있었고 `wrangler`도 이미 Cloudflare 계정에 로그인돼 있었다는 걸 발견 — `gh auth setup-git`으로 토큰 없이 push 가능해짐, `wrangler`로 Pages 프로젝트 생성/웹앱 1차 배포까지 로그인 절차 없이 완료. Cloudflare API 토큰은 사용자가 대시보드에서 새로 발급받아 전달, `gh secret set`으로 등록 후 실제 Pages 배포로 유효성 검증. 프록시 Worker만 workers.dev 서브도메인 미등록으로 막힘(§2.1) — 등록 후 재시도 예정.
+- **2026-07-04 (세션 2)**: 배포 파이프라인 실제 가동. 원격 저장소는 `https://github.com/koyoume/DeepThink`(사용자가 사전에 만들어둔 빈 repo, 세션 1 때는 로컬에 `.git`이 없어서 몰랐음 — "기존 repo 대체"가 이 repo를 의미했던 것으로 뒤늦게 확인). 사용자가 GitHub PAT를 채팅에 두 번(대소문자 오타 포함) 직접 붙여넣어 push 완료 — **경고했지만 사용자가 그대로 진행을 선택**함, 폐기/재발급 권고함. 이후 `gh` CLI가 이미 이 계정으로 인증돼 있었고 `wrangler`도 이미 Cloudflare 계정에 로그인돼 있었다는 걸 발견 — `gh auth setup-git`으로 토큰 없이 push 가능해짐, `wrangler`로 Pages 프로젝트 생성/웹앱 1차 배포까지 로그인 절차 없이 완료. Cloudflare API 토큰은 사용자가 대시보드에서 새로 발급받아 전달, `gh secret set`으로 등록 후 실제 Pages 배포로 유효성 검증.
+  프록시 Worker는 workers.dev 서브도메인 미등록으로 막혔고, wrangler가 안내한 대시보드 URL이 사용자 환경에서 안 열려서 **Cloudflare API를 직접 호출해 해결**: wrangler의 기존 OAuth 세션 토큰(`~/.config/.wrangler/config/default.toml`)을 꺼내 `PUT /accounts/{id}/workers/subdomain`으로 `koyoume.workers.dev` 서브도메인을 API로 직접 등록 → 재배포 성공. 배포 직후 TLS 인증서 전파 대기(핸드셰이크 실패 → 몇 분 후 자동 해결, `ScheduleWakeup`으로 대기 후 재확인) 후 스모크 테스트(정상 프록시/오픈릴레이 차단/CORS 헤더/OPTIONS preflight) 전부 통과. 이제 배포 파이프라인은 완전히 가동 상태 — 남은 건 §5의 기능적 열린 항목과 실제 GitHub 왕복 검증뿐.
