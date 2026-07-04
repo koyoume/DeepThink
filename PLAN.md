@@ -1,5 +1,5 @@
 # DeepThink 웹 이식 — 계획·진행 현황
-> 상태: P0~P5 완료, 배포 라이브 · 실사용 중 격리 보장 버그 발견/수정(§6 세션3) · 최종 갱신 2026-07-04
+> 상태: P0~P6 완료, 배포 라이브(Pages+프록시 Worker). 실사용 중 격리 보장 버그 발견/수정(§6 세션3), P6에서 PWA 설치(manifest-only) 추가(§6 세션4) · 최종 갱신 2026-07-05
 
 ## 1. 확정된 결정
 | 항목 | 결정 | 비고 |
@@ -67,6 +67,7 @@
 - [x] P3 · Playwright로 실브라우저 검증(대시보드↔상세↔설정 전환, 인라인 편집, Enter로 추가, Tab 들여쓰기, 새로고침 후 IndexedDB 영속 확인, 브라우저 뒤로가기) — 콘솔 에러 0건
 - [x] P4 · GitHub Actions 배포 파이프라인 (`.github/workflows/deploy.yml`: npm ci→verify:domain→build→E2E 게이트→wrangler pages deploy, §6.2 함정 회피). 프록시용 `deploy-proxy.yml` 별도.
 - [x] P5 · Playwright E2E 스켈레톤 (`playwright.config.ts` + `e2e/dashboard-flow.spec.ts`) — `npm run build && npm run test:e2e`로 프로덕션 빌드(dist/) 대상 통과 확인. `deploy.yml`의 E2E 게이트가 이제 실제로 존재하는 스크립트를 참조함
+- [x] P6 · PWA 설치 지원 (manifest-only, **오프라인은 범위 밖**) — `public/manifest.webmanifest`, 아이콘 4종(192/512/maskable-512/apple-touch-180, favicon.svg 래스터화), `index.html`에 manifest·theme-color·iOS 메타 추가. `npm run build`로 `dist/`에 포함·index.html 참조 확인. 실기기 "홈 화면에 추가" 테스트는 배포 후 사용자 확인 필요. REQUIREMENTS §7 정정 + §9 신설.
 
 ## 4. 개발 워크플로
 `WEB_DEV_GUIDE.md` 그대로 따름 — 의미 있는 단위마다 즉시 commit, 애매한 UX 결정은 짧은 질문으로 확인 후 진행.
@@ -90,3 +91,4 @@
 - **2026-07-04 (세션 3)**: 실사용 버그 2건 발견/수정.
   1) 배포된 앱에서 "Pull" 클릭 시 `Buffer is not defined` — isomorphic-git이 브라우저에 없는 Node 전역 `Buffer`를 참조. `buffer` 패키지 + `src/polyfills.ts`로 해결, Playwright로 실제 Pull 버튼을 눌러 GitHub까지 요청이 도달함을 확인(가짜 토큰으로 401까지 도달).
   2) **🔴 사용자가 직접 리포트한 중대 버그**: "저장소 초기화/pull이 격리 지침을 위반, repo를 초기화시켜버림." 실제로는 GitHub 원격 자체가 리셋된 게 아니라, 사용자의 실제 vault 저장소(`koyoume/DataHub`)에서 카테고리 1개만 동기화했는데 무관한 카테고리 5개 + 루트 파일 2개(`WORKFLOW.md` 포함)가 HEAD에서 통째로 사라진 것 — GitHub API로 실제 커밋 diff를 까보고 재현·확인. 근본 원인: `pull()`의 `git.branch({checkout:true})`/`git.merge()`가 워킹 디렉토리·인덱스를 실제로 채우지 않아서, 이후 "파일 1개만 add→commit"이 인덱스에 없는 나머지 전부를 삭제해버림(Node 재현으로 정확한 메커니즘 확인). `git.checkout()`을 명시적으로 추가해 수정 + `assertIndexMatchesHead()` 안전장치(다른 파일이 사라질 것 같으면 커밋 자체를 거부) 추가 + 로컬 git smart-HTTP 서버 기반 회귀 테스트(`regressionIsolation.mjs`)로 재발 방지. `koyoume/DataHub`의 실제 삭제된 데이터는 git 히스토리에 남아있어 복구 가능하지만 아직 안 함(§5).
+- **2026-07-05 (세션 4)**: 사용자 질문 "왜 웹앱으로 저장(설치)이 안 되나?"에서 출발 — 확인 결과 `index.html`에 manifest/service worker/apple 메타가 전혀 없었음(원래 PWA가 Non-Goal이었기 때문). 사용자가 **설치만(manifest-only)** 범위로 선택. P6 구현: `favicon.svg`(보라 글리프)를 sharp로 흰 배경 중앙 배치 래스터화해 아이콘 4종 생성, `manifest.webmanifest` 작성, `index.html`에 링크·메타 추가. `theme_color`는 로고 보라가 아니라 앱 실제 크롬색인 중립 `#fafafa`로 선택(상태바가 헤더와 이어지도록). `npm run build`로 dist 포함 확인. 오프라인(service worker)은 명시적으로 범위 밖 유지 — 네트워크 없으면 안 열림. 향후 오프라인까지 원하면 vite-plugin-pwa로 확장 가능(현재 보류). REQUIREMENTS §7 정정 + §9 신설.

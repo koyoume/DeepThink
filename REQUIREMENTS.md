@@ -94,7 +94,7 @@ interface Category {
 - 편집 후 400ms debounce 저장 (원본 `TopicDetailViewModel.scheduleSave` 동일 패턴).
 
 ## 7. 범위 제외 (Non-Goals)
-- PWA/오프라인 지원
+- ~~PWA/오프라인 지원~~ → **정정**: PWA **설치**는 지원함(§9 참조). **오프라인 실행(service worker/캐싱)** 은 여전히 범위 제외.
 - Android `migrateLegacyRootFiles()` 레거시 마이그레이션 로직
 - PAT 암호화 저장(향후 개선 후보)
 - 검색 기능 구체 동작(추후 정의)
@@ -115,3 +115,10 @@ interface Category {
   **수정**: `pull()`의 두 분기 모두 `git.branch()`/`git.merge()` 직후 명시적으로 `git.checkout({ref: BRANCH, force: true})`를 호출해 워킹 디렉토리+인덱스를 실제로 HEAD와 맞춤. **추가 안전장치**: `syncCategory()`가 커밋하기 직전 `git.statusMatrix({ref: HEAD})`로 "HEAD엔 있는데 인덱스엔 없는"(=이 커밋에서 사라질) 파일이 대상 파일 외에 하나라도 있으면 커밋 자체를 막고 에러를 반환하는 `assertIndexMatchesHead()` 가드 추가 — 근본 수정이 뚫려도 격리 보장이 조용히 깨지지 않고 시끄럽게 실패하도록.
   **회귀 테스트**: `src/git/__verify__/regressionIsolation.mjs` — `git http-backend`를 감싼 로컬 smart-HTTP 서버(`localGitServer.mjs`, 외부 네트워크/GitHub 계정 불필요)로 실제 `pull()`/`syncCategory()`를 왕복시켜, 사전에 존재하던 무관한 파일들이 카테고리 동기화 후에도 살아있는지 검증. `npm run verify:domain`에 포함되어 매번 실행됨.
   **영향받은 실제 데이터 복구는 미완료** — `koyoume/DataHub`는 git 히스토리에 삭제 전 커밋이 남아있어 데이터 자체는 복구 가능하지만, 아직 되돌리지 않음(§5 열린 항목).
+
+## 9. PWA 설치 (manifest-only)
+홈 화면에 독립 앱(standalone)으로 설치 가능하게만 함. **오프라인 실행은 하지 않음**(service worker 없음 — 네트워크 없으면 여전히 안 열림).
+- `public/manifest.webmanifest`: name/short_name `DeepThink`, `start_url`·`scope` `/`, `display: standalone`, `background_color`/`theme_color` `#fafafa`(앱 실제 헤더·배경인 neutral-50과 일치 — 로고는 보라 `#863bff`지만 UI 크롬은 중립톤이라 상태바가 헤더와 이어지도록 중립색 선택).
+- 아이콘: `favicon.svg`(보라 글리프)를 흰 배경에 중앙 배치로 래스터화 — `icon-192.png`, `icon-512.png`(purpose any), `icon-maskable-512.png`(safe-zone 여백↑), `apple-touch-icon.png`(180, iOS·투명도 없음).
+- `index.html`: manifest 링크 + `theme-color` + `apple-touch-icon` + iOS 독립실행 메타(`mobile-web-app-capable`/`apple-mobile-web-app-*`).
+- 설치 조건(이름·192/512 아이콘·start_url·display·HTTPS)은 Cloudflare Pages(HTTPS)에서 모두 충족.
