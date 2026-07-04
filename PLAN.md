@@ -39,8 +39,15 @@
 ## 2.1 Cloudflare Worker CORS 프록시 배포 (사용자 수동 작업 필요)
 1. `cd proxy && npx wrangler login` (Cloudflare 계정 로그인 — 이 부분은 에이전트가 대신 못 함)
 2. `npm run deploy` → 배포된 `*.workers.dev` URL 확인
-3. 그 URL을 웹 앱 설정(Settings 화면, P3에서 구현)의 `corsProxy` 값으로 입력
+3. 그 URL을 웹 앱 설정(Settings 화면)의 `corsProxy` 값으로 입력
 4. `ALLOWED_HOSTS`(wrangler.jsonc의 vars)는 기본 `github.com,gitlab.com,bitbucket.org` — 다른 호스트 쓰면 이 값 수정 후 재배포
+
+## 2.2 CI 배포 사전 준비 (사용자 수동 작업 필요)
+`.github/workflows/deploy.yml`/`deploy-proxy.yml`은 GitHub remote가 연결되고 아래가 준비돼야 실제로 동작한다:
+1. 이 로컬 repo를 GitHub repo로 push(`git remote add origin ... && git push -u origin main`)
+2. Cloudflare Pages 프로젝트 1회 생성: `npx wrangler pages project create deepthink`
+3. GitHub repo Settings → Secrets에 `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` 등록
+4. (선택) 프록시 워커도 위와 동일한 시크릿으로 `deploy-proxy.yml`이 배포
 
 ## 3. 단계별 작업 (체크리스트)
 - [x] P0-1 · Android 코드 `android-backup/`로 이동, UI 문서 `docs/legacy-prototype/`로 이동 — 확인: `ls` 결과로 루트 정리됨
@@ -58,7 +65,7 @@
 - [x] P3 · Settings 화면 (git 설정, CORS 프록시, 미리보기 기본값, 카테고리 관리, 동기화 버튼)
 - [x] P3 · Zustand store (`vaultStore.ts`, `gitStore.ts`) — TopicRepositoryImpl/DashboardViewModel/SettingsViewModel 로직 이식
 - [x] P3 · Playwright로 실브라우저 검증(대시보드↔상세↔설정 전환, 인라인 편집, Enter로 추가, Tab 들여쓰기, 새로고침 후 IndexedDB 영속 확인, 브라우저 뒤로가기) — 콘솔 에러 0건
-- [ ] P4 · GitHub Actions 배포 파이프라인 (빌드→검증→wrangler pages deploy)
+- [x] P4 · GitHub Actions 배포 파이프라인 (`.github/workflows/deploy.yml`: npm ci→verify:domain→build→E2E 게이트→wrangler pages deploy, §6.2 함정 회피). 프록시용 `deploy-proxy.yml` 별도.
 - [ ] P5 · Playwright E2E 스켈레톤 + 배포 게이트
 
 ## 4. 개발 워크플로
@@ -74,3 +81,4 @@
 - **2026-07-05 (세션 1)**: 웹 이식 킥오프. 핵심 결정 3가지 확인(클라이언트 사이드 git, 저장소 재구성, 새 UI 디자인). 계획 승인 후 P0 착수 — Android 코드 `android-backup/`, UI 문서 `docs/legacy-prototype/`로 이동, Vite+React+TS+Tailwind 스캐폴드 완료(build/dev 확인). 이어서 P1 도메인 로직 포팅: `models.ts`/`markdownCodec.ts`(Kotlin 4개 golden case 이식, round-trip 통과), `vaultStore.ts`(LightningFS, fake-indexeddb로 Node에서 검증). `enum` 대신 문자열 유니온 사용(tsconfig `erasableSyntaxOnly` 때문에 enum·parameter property 문법 모두 컴파일 에러 — Node 네이티브 TS 실행과 궁합 좋게 순수 타입 주석만 쓰도록 함).
   이어서 P2: `gitSync.ts`(isomorphic-git, JGitClient.kt/GitSyncRepositoryImpl.kt 로직 1:1), `settingsStore.ts`, Cloudflare Worker CORS 프록시(`proxy/`, `wrangler deploy --dry-run` 통과). 실제 GitHub 왕복 검증은 PAT가 필요해 사용자 선택으로 **보류**(추후 `npm run verify:git` 또는 P3 UI에서 실사용하며 검증) — `gitSync.ts`는 타입체크만 통과한 상태로 다음 단계 진행.
   이어서 P3: Zustand store(`vaultStore.ts`/`gitStore.ts`) + 3개 화면(Dashboard/TopicDetail/Settings) 구현, 새 Tailwind 디자인. Playwright(Chromium)를 설치해 실브라우저로 직접 검증하다가 **실버그 발견**: LightningFS가 IndexedDB 저장을 500ms 디바운스하는데 우리 앱은 그걸 모르고 있었음 — 편집 후 곧장 새로고침하면 데이터가 유실될 수 있는 창이 있었음. `VaultFileStore`의 write 계열 메서드(`writeCategory`/`deleteCategoryFile`/`writeOrder`) 끝에 `fs.promises.flush()`를 추가해 즉시 영속되도록 수정, Playwright로 새로고침 후 데이터 유지 확인 완료.
+  이어서 P4: `.github/workflows/deploy.yml`(npm ci→verify:domain→build→E2E게이트→wrangler pages deploy) + `deploy-proxy.yml`(proxy/ 변경 시에만) 작성. 이 repo는 아직 GitHub remote가 없어 실제 실행은 안 됨 — §2.2에 사용자가 해야 할 준비(remote 연결, Pages 프로젝트 생성, GitHub Secrets 등록) 정리.
