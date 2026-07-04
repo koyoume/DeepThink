@@ -1,5 +1,5 @@
 # DeepThink 웹 이식 — 계획·진행 현황
-> 상태: P0~P5 완료, 배포 파이프라인 실가동 중 (Pages+프록시 Worker 모두 라이브) · 최종 갱신 2026-07-04
+> 상태: P0~P5 완료, 배포 라이브 · 실사용 중 격리 보장 버그 발견/수정(§6 세션3) · 최종 갱신 2026-07-04
 
 ## 1. 확정된 결정
 | 항목 | 결정 | 비고 |
@@ -77,6 +77,7 @@
 - 관련 자료 추가 UI (표시/삭제는 구현, 새로 추가하는 입력 폼은 없음)
 - 웹 앱 Settings 화면에 프록시 URL(`https://deepthink-git-proxy.koyoume.workers.dev`) 입력해서 실사용 테스트 (배포 자체는 완료)
 - 실제 GitHub 저장소로 clone/push/pull 왕복 검증 (P2에서 PAT 없어 보류, `npm run verify:git` 또는 실사용 중 확인)
+- **`koyoume/DataHub` 실제 데이터 복구**: §6 세션 3의 격리 보장 버그로 HEAD에서 사라진 카테고리 5개(Assets/Books/Dev(company)/Dev(personal)/Life) + `WORKFLOW.md`가 git 히스토리엔 남아있음(커밋 `e22f12b9`). 아직 복구 안 함 — 되돌리려면 해당 커밋에서 파일들을 복원해 새 커밋으로 다시 push 필요.
 
 ## 6. 세션 이력 (진행 로그)
 - **2026-07-05 (세션 1)**: 웹 이식 킥오프. 핵심 결정 3가지 확인(클라이언트 사이드 git, 저장소 재구성, 새 UI 디자인). 계획 승인 후 P0 착수 — Android 코드 `android-backup/`, UI 문서 `docs/legacy-prototype/`로 이동, Vite+React+TS+Tailwind 스캐폴드 완료(build/dev 확인). 이어서 P1 도메인 로직 포팅: `models.ts`/`markdownCodec.ts`(Kotlin 4개 golden case 이식, round-trip 통과), `vaultStore.ts`(LightningFS, fake-indexeddb로 Node에서 검증). `enum` 대신 문자열 유니온 사용(tsconfig `erasableSyntaxOnly` 때문에 enum·parameter property 문법 모두 컴파일 에러 — Node 네이티브 TS 실행과 궁합 좋게 순수 타입 주석만 쓰도록 함).
@@ -86,3 +87,6 @@
   이어서 P5: Playwright 설정(`playwright.config.ts`, `vite preview`로 실제 프로덕션 빌드 대상) + `e2e/dashboard-flow.spec.ts`(P3에서 수기로 검증했던 시나리오를 정식 테스트로 포맷 — 대시보드 로드, 상세 진입/제목 수정, 입력바로 생각 추가, Tab 들여쓰기, 뒤로가기+새로고침 영속, 설정 화면+브라우저 뒤로가기). `npm run build && npm run test:e2e` 로컬 통과 확인 — 이제 §P0~P5 전체 골격 완료, 남은 건 사용자 쪽 계정/시크릿 설정(§2.1, §2.2)과 실제 GitHub 왕복 검증(§P2 보류 항목).
 - **2026-07-04 (세션 2)**: 배포 파이프라인 실제 가동. 원격 저장소는 `https://github.com/koyoume/DeepThink`(사용자가 사전에 만들어둔 빈 repo, 세션 1 때는 로컬에 `.git`이 없어서 몰랐음 — "기존 repo 대체"가 이 repo를 의미했던 것으로 뒤늦게 확인). 사용자가 GitHub PAT를 채팅에 두 번(대소문자 오타 포함) 직접 붙여넣어 push 완료 — **경고했지만 사용자가 그대로 진행을 선택**함, 폐기/재발급 권고함. 이후 `gh` CLI가 이미 이 계정으로 인증돼 있었고 `wrangler`도 이미 Cloudflare 계정에 로그인돼 있었다는 걸 발견 — `gh auth setup-git`으로 토큰 없이 push 가능해짐, `wrangler`로 Pages 프로젝트 생성/웹앱 1차 배포까지 로그인 절차 없이 완료. Cloudflare API 토큰은 사용자가 대시보드에서 새로 발급받아 전달, `gh secret set`으로 등록 후 실제 Pages 배포로 유효성 검증.
   프록시 Worker는 workers.dev 서브도메인 미등록으로 막혔고, wrangler가 안내한 대시보드 URL이 사용자 환경에서 안 열려서 **Cloudflare API를 직접 호출해 해결**: wrangler의 기존 OAuth 세션 토큰(`~/.config/.wrangler/config/default.toml`)을 꺼내 `PUT /accounts/{id}/workers/subdomain`으로 `koyoume.workers.dev` 서브도메인을 API로 직접 등록 → 재배포 성공. 배포 직후 TLS 인증서 전파 대기(핸드셰이크 실패 → 몇 분 후 자동 해결, `ScheduleWakeup`으로 대기 후 재확인) 후 스모크 테스트(정상 프록시/오픈릴레이 차단/CORS 헤더/OPTIONS preflight) 전부 통과. 이제 배포 파이프라인은 완전히 가동 상태 — 남은 건 §5의 기능적 열린 항목과 실제 GitHub 왕복 검증뿐.
+- **2026-07-04 (세션 3)**: 실사용 버그 2건 발견/수정.
+  1) 배포된 앱에서 "Pull" 클릭 시 `Buffer is not defined` — isomorphic-git이 브라우저에 없는 Node 전역 `Buffer`를 참조. `buffer` 패키지 + `src/polyfills.ts`로 해결, Playwright로 실제 Pull 버튼을 눌러 GitHub까지 요청이 도달함을 확인(가짜 토큰으로 401까지 도달).
+  2) **🔴 사용자가 직접 리포트한 중대 버그**: "저장소 초기화/pull이 격리 지침을 위반, repo를 초기화시켜버림." 실제로는 GitHub 원격 자체가 리셋된 게 아니라, 사용자의 실제 vault 저장소(`koyoume/DataHub`)에서 카테고리 1개만 동기화했는데 무관한 카테고리 5개 + 루트 파일 2개(`WORKFLOW.md` 포함)가 HEAD에서 통째로 사라진 것 — GitHub API로 실제 커밋 diff를 까보고 재현·확인. 근본 원인: `pull()`의 `git.branch({checkout:true})`/`git.merge()`가 워킹 디렉토리·인덱스를 실제로 채우지 않아서, 이후 "파일 1개만 add→commit"이 인덱스에 없는 나머지 전부를 삭제해버림(Node 재현으로 정확한 메커니즘 확인). `git.checkout()`을 명시적으로 추가해 수정 + `assertIndexMatchesHead()` 안전장치(다른 파일이 사라질 것 같으면 커밋 자체를 거부) 추가 + 로컬 git smart-HTTP 서버 기반 회귀 테스트(`regressionIsolation.mjs`)로 재발 방지. `koyoume/DataHub`의 실제 삭제된 데이터는 git 히스토리에 남아있어 복구 가능하지만 아직 안 함(§5).

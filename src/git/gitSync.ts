@@ -104,7 +104,13 @@ export async function pull(deps: GitSyncDeps, repoDir: string, config: GitConfig
 
     if (localOid === null) {
       // 로컬에 커밋이 없는 첫 동기화 — origin/main을 그대로 로컬 main으로 채택(클론과 동등한 효과)
-      await git.branch({ fs: deps.fs, dir: repoDir, ref: BRANCH, object: remoteOid, force: true, checkout: true })
+      //
+      // ⚠️ git.branch({checkout: true})는 워킹 디렉토리/인덱스에 파일을 전혀 쓰지 않는다(확인됨,
+      // REQUIREMENTS.md §8 참고) — 반드시 별도로 git.checkout()을 호출해야 인덱스가 HEAD와
+      // 실제로 맞춰진다. 이게 안 되면 이후 syncCategory()의 "파일 1개만 add→commit"이 인덱스에
+      // 없는 다른 모든 파일을 커밋에서 통째로 빠뜨려 삭제해버린다(실제로 겪은 데이터 유실 사고).
+      await git.branch({ fs: deps.fs, dir: repoDir, ref: BRANCH, object: remoteOid, force: true })
+      await git.checkout({ fs: deps.fs, dir: repoDir, ref: BRANCH, force: true })
       return { ok: true, message: '초기 동기화 완료' }
     }
     if (localOid === remoteOid) {
@@ -119,6 +125,8 @@ export async function pull(deps: GitSyncDeps, repoDir: string, config: GitConfig
       fastForwardOnly: true,
       author: author(config),
     })
+    // merge()도 마찬가지로 워킹 디렉토리/인덱스를 완전히 갱신하지 않는 경우가 있어 명시적으로 checkout
+    await git.checkout({ fs: deps.fs, dir: repoDir, ref: BRANCH, force: true })
     return { ok: true, message: 'pull 완료' }
   } catch (err) {
     return { ok: false, message: describeError(err) }
@@ -127,6 +135,30 @@ export async function pull(deps: GitSyncDeps, repoDir: string, config: GitConfig
 
 /** initOrClone: pull과 동일(ensureRepo는 pull 내부에서 항상 먼저 수행됨) */
 export const initOrClone = pull
+
+/**
+ * 안전장치: 커밋 직전 인덱스가 HEAD와 어긋나 있으면(=커밋 시 무관한 파일이 통째로 사라질 위험)
+ * 커밋을 아예 중단시킨다. pull()의 checkout 수정으로 정상 흐름에선 발생하지 않아야 하지만,
+ * "다른 파일은 절대 건드리지 않는다"는 핵심 보장을 지키기 위한 마지막 방어선.
+ */
+async function assertIndexMatchesHead(deps: GitSyncDeps, repoDir: string, protectedPath: string): Promise<void> {
+  let headOid: string
+  try {
+    headOid = await git.resolveRef({ fs: deps.fs, dir: repoDir, ref: 'HEAD' })
+  } catch {
+    return // 아직 커밋이 없는 저장소 — 지킬 기존 파일이 없으므로 통과
+  }
+  const rows = await git.statusMatrix({ fs: deps.fs, dir: repoDir, ref: headOid })
+  // headStatus===1(HEAD에 존재) && stageStatus===0(인덱스엔 없음) = 이 커밋에서 사라질 파일
+  const wouldBeDeleted = rows
+    .filter(([filepath, head, , stage]) => head === 1 && stage === 0 && filepath !== protectedPath)
+    .map(([filepath]) => filepath)
+  if (wouldBeDeleted.length > 0) {
+    throw new Error(
+      `안전장치 작동: 커밋하면 ${protectedPath}와 무관한 파일 ${wouldBeDeleted.length}개가 사라질 위험이 있어 중단했습니다 (${wouldBeDeleted.join(', ')}). "저장소 초기화"로 다시 동기화한 뒤 재시도하세요.`,
+    )
+  }
+}
 
 /** 지정한 카테고리 파일 1개만 add → commit → push. */
 export async function syncCategory(
@@ -144,6 +176,7 @@ export async function syncCategory(
     const fileStatus = await git.status({ fs: deps.fs, dir: repoDir, filepath: relativePath })
     const nothingStaged = fileStatus === 'unmodified'
     if (!nothingStaged) {
+      await assertIndexMatchesHead(deps, repoDir, relativePath)
       await git.commit({ fs: deps.fs, dir: repoDir, message, author: author(config), committer: author(config) })
     }
 

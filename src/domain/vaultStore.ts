@@ -26,6 +26,12 @@ function slug(name: string): string {
   return cleaned.length > 0 ? cleaned : 'untitled'
 }
 
+/** LightningFS만 갖는 IndexedDB flush — Node의 실제 fs(검증 스크립트용)엔 없고 필요도 없다. */
+async function flushIfSupported(fs: LightningFS): Promise<void> {
+  const maybeFlush = (fs.promises as { flush?: () => Promise<void> }).flush
+  if (typeof maybeFlush === 'function') await maybeFlush.call(fs.promises)
+}
+
 export class VaultFileStore {
   private readonly fs: LightningFS
   readonly repoDir: string
@@ -95,13 +101,13 @@ export class VaultFileStore {
   async writeCategory(name: string, topics: Topic[]): Promise<void> {
     await this.ensureDirs()
     await this.fs.promises.writeFile(this.categoryFile(name), serializeCategory(name, topics), 'utf8')
-    await this.fs.promises.flush()
+    await flushIfSupported(this.fs)
   }
 
   async deleteCategoryFile(name: string): Promise<void> {
     try {
       await this.fs.promises.unlink(this.categoryFile(name))
-      await this.fs.promises.flush()
+      await flushIfSupported(this.fs)
     } catch (err) {
       if (!isNotFound(err)) throw err
     }
@@ -133,6 +139,6 @@ export class VaultFileStore {
   async writeOrder(names: string[]): Promise<void> {
     await this.ensureDirs()
     await this.fs.promises.writeFile(this.orderFile, JSON.stringify(names, null, 2), 'utf8')
-    await this.fs.promises.flush()
+    await flushIfSupported(this.fs)
   }
 }
