@@ -9,7 +9,8 @@
     "lint": "oxlint",
     "preview": "vite preview",
     "verify:domain": "node src/domain/__verify__/cases.mjs && node src/domain/__verify__/vaultStore.mjs",
-    "verify:git": "node src/git/__verify__/liveSync.mjs"
+    "verify:git": "node src/git/__verify__/liveSync.mjs",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@isomorphic-git/lightning-fs": "^4.6.2",

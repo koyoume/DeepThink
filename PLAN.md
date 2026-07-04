@@ -1,5 +1,5 @@
 # DeepThink 웹 이식 — 계획·진행 현황
-> 상태: P0 진행 중 · 최종 갱신 2026-07-05
+> 상태: P0~P5 골격 완료, 사용자 쪽 계정/시크릿 설정 대기 · 최종 갱신 2026-07-05
 
 ## 1. 확정된 결정
 | 항목 | 결정 | 비고 |
@@ -66,19 +66,22 @@
 - [x] P3 · Zustand store (`vaultStore.ts`, `gitStore.ts`) — TopicRepositoryImpl/DashboardViewModel/SettingsViewModel 로직 이식
 - [x] P3 · Playwright로 실브라우저 검증(대시보드↔상세↔설정 전환, 인라인 편집, Enter로 추가, Tab 들여쓰기, 새로고침 후 IndexedDB 영속 확인, 브라우저 뒤로가기) — 콘솔 에러 0건
 - [x] P4 · GitHub Actions 배포 파이프라인 (`.github/workflows/deploy.yml`: npm ci→verify:domain→build→E2E 게이트→wrangler pages deploy, §6.2 함정 회피). 프록시용 `deploy-proxy.yml` 별도.
-- [ ] P5 · Playwright E2E 스켈레톤 + 배포 게이트
+- [x] P5 · Playwright E2E 스켈레톤 (`playwright.config.ts` + `e2e/dashboard-flow.spec.ts`) — `npm run build && npm run test:e2e`로 프로덕션 빌드(dist/) 대상 통과 확인. `deploy.yml`의 E2E 게이트가 이제 실제로 존재하는 스크립트를 참조함
 
 ## 4. 개발 워크플로
 `WEB_DEV_GUIDE.md` 그대로 따름 — 의미 있는 단위마다 즉시 commit, 애매한 UX 결정은 짧은 질문으로 확인 후 진행.
 
 ## 5. 열린 항목 / 추후 결정
-- 검색 동작 정의 (UI-DESIGN.md TODO에서 이월)
-- 카테고리 관리(추가/이름변경/색) UI
-- 관련 자료 추가 UI
-- Cloudflare Worker 프록시의 실제 URL/배포 계정 확정 (P2에서)
+- 검색 동작 정의 (UI-DESIGN.md TODO에서 이월, 아직 미구현)
+- 카테고리 색상 커스터마이징 (추가/이름변경/삭제는 Settings 화면에 구현됨, 색은 없음)
+- 관련 자료 추가 UI (표시/삭제는 구현, 새로 추가하는 입력 폼은 없음)
+- Cloudflare Worker 프록시 실제 배포 (§2.1, 사용자가 `wrangler login` 필요)
+- CI 배포 사전 준비 (§2.2, GitHub remote 연결 + Secrets 등록)
+- 실제 GitHub 저장소로 clone/push/pull 왕복 검증 (P2에서 PAT 없어 보류, `npm run verify:git` 또는 실사용 중 확인)
 
 ## 6. 세션 이력 (진행 로그)
 - **2026-07-05 (세션 1)**: 웹 이식 킥오프. 핵심 결정 3가지 확인(클라이언트 사이드 git, 저장소 재구성, 새 UI 디자인). 계획 승인 후 P0 착수 — Android 코드 `android-backup/`, UI 문서 `docs/legacy-prototype/`로 이동, Vite+React+TS+Tailwind 스캐폴드 완료(build/dev 확인). 이어서 P1 도메인 로직 포팅: `models.ts`/`markdownCodec.ts`(Kotlin 4개 golden case 이식, round-trip 통과), `vaultStore.ts`(LightningFS, fake-indexeddb로 Node에서 검증). `enum` 대신 문자열 유니온 사용(tsconfig `erasableSyntaxOnly` 때문에 enum·parameter property 문법 모두 컴파일 에러 — Node 네이티브 TS 실행과 궁합 좋게 순수 타입 주석만 쓰도록 함).
   이어서 P2: `gitSync.ts`(isomorphic-git, JGitClient.kt/GitSyncRepositoryImpl.kt 로직 1:1), `settingsStore.ts`, Cloudflare Worker CORS 프록시(`proxy/`, `wrangler deploy --dry-run` 통과). 실제 GitHub 왕복 검증은 PAT가 필요해 사용자 선택으로 **보류**(추후 `npm run verify:git` 또는 P3 UI에서 실사용하며 검증) — `gitSync.ts`는 타입체크만 통과한 상태로 다음 단계 진행.
   이어서 P3: Zustand store(`vaultStore.ts`/`gitStore.ts`) + 3개 화면(Dashboard/TopicDetail/Settings) 구현, 새 Tailwind 디자인. Playwright(Chromium)를 설치해 실브라우저로 직접 검증하다가 **실버그 발견**: LightningFS가 IndexedDB 저장을 500ms 디바운스하는데 우리 앱은 그걸 모르고 있었음 — 편집 후 곧장 새로고침하면 데이터가 유실될 수 있는 창이 있었음. `VaultFileStore`의 write 계열 메서드(`writeCategory`/`deleteCategoryFile`/`writeOrder`) 끝에 `fs.promises.flush()`를 추가해 즉시 영속되도록 수정, Playwright로 새로고침 후 데이터 유지 확인 완료.
   이어서 P4: `.github/workflows/deploy.yml`(npm ci→verify:domain→build→E2E게이트→wrangler pages deploy) + `deploy-proxy.yml`(proxy/ 변경 시에만) 작성. 이 repo는 아직 GitHub remote가 없어 실제 실행은 안 됨 — §2.2에 사용자가 해야 할 준비(remote 연결, Pages 프로젝트 생성, GitHub Secrets 등록) 정리.
+  이어서 P5: Playwright 설정(`playwright.config.ts`, `vite preview`로 실제 프로덕션 빌드 대상) + `e2e/dashboard-flow.spec.ts`(P3에서 수기로 검증했던 시나리오를 정식 테스트로 포맷 — 대시보드 로드, 상세 진입/제목 수정, 입력바로 생각 추가, Tab 들여쓰기, 뒤로가기+새로고침 영속, 설정 화면+브라우저 뒤로가기). `npm run build && npm run test:e2e` 로컬 통과 확인 — 이제 §P0~P5 전체 골격 완료, 남은 건 사용자 쪽 계정/시크릿 설정(§2.1, §2.2)과 실제 GitHub 왕복 검증(§P2 보류 항목).

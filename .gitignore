@@ -9,6 +9,9 @@ dist
 dist-ssr
 *.local
 .wrangler/
+playwright-report/
+test-results/
+blob-report/
 
 # Editor
 .vscode/*
