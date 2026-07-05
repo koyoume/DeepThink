@@ -42,13 +42,13 @@ export function TopicDetailScreen({ topicId, onBack }: Props) {
   }
 
   return (
-    <div className="mx-auto flex min-h-screen w-full max-w-2xl flex-col bg-neutral-50">
+    <div className="mx-auto flex min-h-screen w-full max-w-2xl flex-col bg-paper">
       <header className="flex items-center justify-between px-4 pt-4">
-        <button type="button" onClick={handleBack} aria-label="뒤로가기" className="text-xl text-neutral-600">
+        <button type="button" onClick={handleBack} aria-label="뒤로가기" className="text-xl text-muted">
           ‹
         </button>
         <div className="relative">
-          <button type="button" onClick={() => setMenuOpen((v) => !v)} aria-label="더보기" className="text-xl text-neutral-600">
+          <button type="button" onClick={() => setMenuOpen((v) => !v)} aria-label="더보기" className="text-xl text-muted">
             ⋯
           </button>
           {menuOpen && (
@@ -72,7 +72,7 @@ export function TopicDetailScreen({ topicId, onBack }: Props) {
         <select
           value={detail.state.category}
           onChange={(e) => detail.changeCategory(e.target.value)}
-          className="rounded-full border border-neutral-300 bg-white px-3 py-1 text-xs text-neutral-600"
+          className="rounded-lg border border-line bg-surface px-3 py-1 text-xs text-muted"
         >
           {categories.map((c) => (
             <option key={c.name} value={c.name}>
@@ -89,22 +89,22 @@ export function TopicDetailScreen({ topicId, onBack }: Props) {
           onChange={(e) => detail.setTitle(e.target.value)}
           placeholder="제목을 입력하세요"
           rows={2}
-          className="h-full w-full resize-none overflow-hidden border-none bg-transparent font-serif leading-tight text-neutral-900 outline-none"
+          className="h-full w-full resize-none overflow-hidden border-none bg-transparent font-serif font-semibold leading-tight text-ink outline-none"
         />
       </div>
 
       {detail.state.materials.length > 0 && (
         <div className="px-4 pt-2">
-          <p className="text-xs text-neutral-400">관련 자료 (선택)</p>
+          <p className="text-xs text-faint">관련 자료 (선택)</p>
           <ul className="mt-1 flex flex-col gap-1">
             {detail.state.materials.map((m, i) => (
-              <li key={`${m.title}-${i}`} className="flex items-center justify-between rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm">
+              <li key={`${m.title}-${i}`} className="flex items-center justify-between rounded-lg border border-line bg-surface px-3 py-2 text-sm">
                 <div className="flex items-center gap-2 overflow-hidden">
-                  <span className="text-neutral-400">{m.kind === 'link' ? '🔗' : '📄'}</span>
+                  <span className="text-faint">{m.kind === 'link' ? '🔗' : '📄'}</span>
                   <span className="truncate">{m.title}</span>
-                  {m.sub && <span className="shrink-0 text-xs text-neutral-400">{m.sub}</span>}
+                  {m.sub && <span className="shrink-0 text-xs text-faint">{m.sub}</span>}
                 </div>
-                <button type="button" onClick={() => detail.removeMaterial(i)} className="text-neutral-400" aria-label="자료 삭제">
+                <button type="button" onClick={() => detail.removeMaterial(i)} className="text-faint" aria-label="자료 삭제">
                   ×
                 </button>
               </li>
@@ -115,7 +115,7 @@ export function TopicDetailScreen({ topicId, onBack }: Props) {
 
       <div className="flex-1 px-4 pb-24 pt-3">
         {detail.state.thoughts.length === 0 && (
-          <p className="py-8 text-center text-sm text-neutral-400">아직 생각이 없습니다.</p>
+          <p className="py-8 text-center text-sm text-faint">아직 생각이 없습니다.</p>
         )}
         {detail.state.thoughts.map((t) => (
           <ThoughtRow
@@ -139,11 +139,11 @@ export function TopicDetailScreen({ topicId, onBack }: Props) {
         ))}
       </div>
 
-      <footer className="fixed bottom-0 left-1/2 flex w-full max-w-2xl -translate-x-1/2 items-center gap-2 border-t border-neutral-200 bg-white p-3">
+      <footer className="fixed bottom-0 left-1/2 flex w-full max-w-2xl -translate-x-1/2 items-center gap-2 border-t border-line bg-surface p-3">
         <button
           type="button"
           onClick={detail.toggleNewType}
-          className="shrink-0 rounded-full border border-neutral-300 px-2 py-1 text-xs text-neutral-600"
+          className="shrink-0 rounded-lg border border-line px-2.5 py-1 text-xs text-muted"
         >
           {detail.newType === 'check' ? '체크' : '코멘트'}
         </button>
@@ -158,7 +158,7 @@ export function TopicDetailScreen({ topicId, onBack }: Props) {
               submitDraft()
             }
           }}
-          className="flex-1 rounded-full border border-neutral-300 px-3 py-1.5 text-sm outline-none"
+          className="flex-1 rounded-lg border border-line bg-paper px-3 py-1.5 text-sm text-ink outline-none focus:border-brand"
         />
       </footer>
     </div>

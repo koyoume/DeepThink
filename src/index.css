@@ -1,1 +1,34 @@
 @import "tailwindcss";
+
+/* DeepThink 시각 디자인 — "Outliner Ink"
+   동작/레이아웃(레거시 UI-DESIGN §4~6)은 고정, 시각 토큰만 새로. */
+@theme {
+  /* 색 */
+  --color-paper: #FBFAF7;        /* 앱 배경(따뜻한 종이색) */
+  --color-surface: #FFFFFF;      /* 카드/표면 */
+  --color-ink: #211B33;          /* 본문(보라 기미 딥) */
+  --color-muted: #78748A;        /* 보조 텍스트 */
+  --color-faint: #A8A4B4;        /* 더 옅은 보조 */
+  --color-line: #ECEAE3;         /* 구분선 */
+  --color-guide: #E4DEF6;        /* 들여쓰기 가이드선(레일, 보라 기미) */
+  --color-brand: #6B4EFF;        /* 브랜드 강조(활성/완료/FAB) */
+  --color-brand-soft: #EDE9FF;   /* 연한 강조 배경 */
+  --color-comment: #C9803A;      /* 코멘트(amber) */
+  --color-comment-soft: #FBF1E6;
+
+  /* 폰트 — 한글 커버 위해 Noto KR 스택 병기 */
+  --font-sans: "Inter", "Noto Sans KR", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Fraunces", "Noto Serif KR", Georgia, serif;
+}
+
+@layer base {
+  html {
+    background-color: var(--color-paper);
+  }
+  body {
+    background-color: var(--color-paper);
+    color: var(--color-ink);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+}

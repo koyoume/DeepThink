@@ -42,7 +42,7 @@ function App() {
   }
 
   if (!loaded) {
-    return <div className="flex min-h-screen items-center justify-center text-sm text-neutral-500">불러오는 중…</div>
+    return <div className="flex min-h-screen items-center justify-center text-sm text-muted">불러오는 중…</div>
   }
 
   if (screen.name === 'detail') {

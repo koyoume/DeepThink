@@ -89,6 +89,15 @@ interface Category {
 - **들여쓰기 규칙** (`TopicDetailViewModel.shiftLevel` 기준): 들여쓰기 시 상한 = `min(바로 위 줄 level+1, MAX_THOUGHT_LEVEL)`, 내어쓰기 시 하한 0. 대상 줄 이후 `level > 현재 level`인 연속 줄들(하위 트리)이 함께 이동.
 - **설정 화면**: git 원격 URL/username/token/author 설정, 미리보기 기본 줄 수(0~3).
 
+## 5.1 시각 디자인 — "Outliner Ink" (2026-07-05 확정)
+`docs/legacy-prototype/UI-DESIGN.md`의 **동작·레이아웃(§4~6)은 고정**, 시각만 새로 정의. 강조색은 레거시 pine에서 브랜드 보라로 교체.
+- **토큰**(`src/index.css` `@theme`): paper `#FBFAF7` / surface `#FFFFFF` / ink `#211B33` / muted `#78748A` / faint `#A8A4B4` / line `#ECEAE3` / guide(레일) `#E4DEF6` / **brand `#6B4EFF`** / brand-soft `#EDE9FF` / comment(amber) `#C9803A`.
+- **폰트**: 본문 `Inter + Noto Sans KR`, 제목(화면·상세) `Fraunces + Noto Serif KR`. 한글 커버 위해 Noto KR 병기(Fraunces/Inter는 라틴 전용). Google Fonts로 로드, `display=swap`.
+- **강조 운용**: 활성 카테고리 칩·완료 체크·FAB·포커스 = brand. 코멘트 글리프는 amber 유지(체크와 색·모양으로 구분).
+- **형태**: 칩·소형 버튼 `rounded-full`→`rounded-lg`. FAB·코멘트 글리프만 원형 유지. emerald 계열 전면 제거.
+- **PWA/브라우저 크롬**: `theme-color`·manifest `theme_color`/`background_color` = paper `#FBFAF7`(상태바가 앱 배경과 이어지도록).
+- **범위 밖(후속)**: 인라인 굵게/이탤릭(`**`/`*`, 에디터 개조 필요), 검색 화면·기능, 카테고리 색(모델에 색 필드 없음).
+
 ## 6. 비기능 요구
 - 반응형: 데스크톱/모바일 브라우저 모두 대응(원본은 모바일 전용이었으나 웹은 양쪽 지원).
 - 편집 후 400ms debounce 저장 (원본 `TopicDetailViewModel.scheduleSave` 동일 패턴).

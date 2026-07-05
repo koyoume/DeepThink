@@ -70,7 +70,7 @@ export function ThoughtRow(props: Props) {
   return (
     <div
       className="group relative flex items-start gap-2 py-1"
-      style={{ marginLeft: thought.level * 22, borderLeft: thought.level > 0 ? '1px solid #e3e1d9' : undefined, paddingLeft: thought.level > 0 ? 8 : 0 }}
+      style={{ marginLeft: thought.level * 22, borderLeft: thought.level > 0 ? '2px solid var(--color-guide)' : undefined, paddingLeft: thought.level > 0 ? 8 : 0 }}
       onPointerDown={handlePointerDown}
       onPointerUp={handlePointerUp}
     >
@@ -85,7 +85,7 @@ export function ThoughtRow(props: Props) {
         onFocus={props.onFocus}
         onBlur={props.onBlur}
         className={`min-w-0 flex-1 bg-transparent text-sm outline-none ${
-          thought.type === 'check' && thought.done ? 'text-neutral-400 line-through' : 'text-neutral-800'
+          thought.type === 'check' && thought.done ? 'text-faint line-through' : 'text-ink'
         }`}
       />
       <div className="relative">

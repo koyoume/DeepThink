@@ -31,74 +31,74 @@ export function SettingsScreen({ onBack }: Props) {
   const [newCategoryName, setNewCategoryName] = useState('')
 
   return (
-    <div className="mx-auto flex min-h-screen w-full max-w-2xl flex-col gap-6 bg-neutral-50 px-4 pb-16 pt-4">
+    <div className="mx-auto flex min-h-screen w-full max-w-2xl flex-col gap-6 bg-paper px-4 pb-16 pt-4">
       <header className="flex items-center gap-3">
-        <button type="button" onClick={onBack} aria-label="뒤로가기" className="text-xl text-neutral-600">
+        <button type="button" onClick={onBack} aria-label="뒤로가기" className="text-xl text-muted">
           ‹
         </button>
-        <h1 className="text-lg font-semibold text-neutral-900">설정</h1>
+        <h1 className="font-serif text-2xl font-semibold text-ink">설정</h1>
       </header>
 
       {message && (
-        <div className="rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-700">{message}</div>
+        <div className="rounded-lg border border-line bg-white px-3 py-2 text-sm text-muted">{message}</div>
       )}
 
       <section className="flex flex-col gap-2">
-        <h2 className="text-sm font-medium text-neutral-500">Git 저장소</h2>
+        <h2 className="text-sm font-medium text-muted">Git 저장소</h2>
         <input
           value={form.remoteUrl}
           onChange={(e) => setForm({ ...form, remoteUrl: e.target.value })}
           placeholder="https://github.com/you/vault.git"
-          className="rounded-lg border border-neutral-300 px-3 py-2 text-sm"
+          className="rounded-lg border border-line px-3 py-2 text-sm"
         />
         <input
           value={form.username}
           onChange={(e) => setForm({ ...form, username: e.target.value })}
           placeholder="username (비우면 x-access-token)"
-          className="rounded-lg border border-neutral-300 px-3 py-2 text-sm"
+          className="rounded-lg border border-line px-3 py-2 text-sm"
         />
         <input
           value={form.token}
           onChange={(e) => setForm({ ...form, token: e.target.value })}
           type="password"
           placeholder="Personal Access Token"
-          className="rounded-lg border border-neutral-300 px-3 py-2 text-sm"
+          className="rounded-lg border border-line px-3 py-2 text-sm"
         />
         <div className="flex gap-2">
           <input
             value={form.authorName}
             onChange={(e) => setForm({ ...form, authorName: e.target.value })}
             placeholder="커밋 작성자 이름"
-            className="flex-1 rounded-lg border border-neutral-300 px-3 py-2 text-sm"
+            className="flex-1 rounded-lg border border-line px-3 py-2 text-sm"
           />
           <input
             value={form.authorEmail}
             onChange={(e) => setForm({ ...form, authorEmail: e.target.value })}
             placeholder="커밋 작성자 이메일"
-            className="flex-1 rounded-lg border border-neutral-300 px-3 py-2 text-sm"
+            className="flex-1 rounded-lg border border-line px-3 py-2 text-sm"
           />
         </div>
         <button
           type="button"
           onClick={() => saveGitConfig(form)}
-          className="self-start rounded-full bg-emerald-700 px-4 py-1.5 text-sm text-white"
+          className="self-start rounded-lg bg-brand px-4 py-1.5 text-sm text-white"
         >
           Git 설정 저장
         </button>
       </section>
 
       <section className="flex flex-col gap-2">
-        <h2 className="text-sm font-medium text-neutral-500">CORS 프록시 (브라우저 전용)</h2>
+        <h2 className="text-sm font-medium text-muted">CORS 프록시 (브라우저 전용)</h2>
         <input
           value={proxyForm}
           onChange={(e) => setProxyForm(e.target.value)}
           placeholder="https://<worker>.workers.dev"
-          className="rounded-lg border border-neutral-300 px-3 py-2 text-sm"
+          className="rounded-lg border border-line px-3 py-2 text-sm"
         />
         <button
           type="button"
           onClick={() => saveCorsProxy(proxyForm)}
-          className="self-start rounded-full border border-neutral-300 px-4 py-1.5 text-sm text-neutral-700"
+          className="self-start rounded-lg border border-line px-4 py-1.5 text-sm text-muted"
         >
           프록시 저장
         </button>
@@ -109,7 +109,7 @@ export function SettingsScreen({ onBack }: Props) {
           type="button"
           disabled={busy}
           onClick={initOrCloneGit}
-          className="flex-1 rounded-full border border-neutral-300 px-3 py-2 text-sm text-neutral-700 disabled:opacity-50"
+          className="flex-1 rounded-lg border border-line px-3 py-2 text-sm text-muted disabled:opacity-50"
         >
           저장소 초기화 / 첫 동기화
         </button>
@@ -117,22 +117,22 @@ export function SettingsScreen({ onBack }: Props) {
           type="button"
           disabled={busy}
           onClick={pullGit}
-          className="flex-1 rounded-full border border-neutral-300 px-3 py-2 text-sm text-neutral-700 disabled:opacity-50"
+          className="flex-1 rounded-lg border border-line px-3 py-2 text-sm text-muted disabled:opacity-50"
         >
           Pull
         </button>
       </section>
 
       <section className="flex flex-col gap-2">
-        <h2 className="text-sm font-medium text-neutral-500">미리보기 기본 줄 수</h2>
+        <h2 className="text-sm font-medium text-muted">미리보기 기본 줄 수</h2>
         <div className="flex gap-2">
           {[0, 1, 2, 3].map((n) => (
             <button
               key={n}
               type="button"
               onClick={() => setPreviewLinesSetting(n)}
-              className={`rounded-full px-3 py-1 text-sm ${
-                previewLines === n ? 'bg-emerald-700 text-white' : 'border border-neutral-300 text-neutral-600'
+              className={`rounded-lg px-3 py-1 text-sm ${
+                previewLines === n ? 'bg-brand text-white' : 'border border-line text-muted'
               }`}
             >
               {n === 0 ? '끔' : `${n}줄`}
@@ -142,17 +142,17 @@ export function SettingsScreen({ onBack }: Props) {
       </section>
 
       <section className="flex flex-col gap-2">
-        <h2 className="text-sm font-medium text-neutral-500">카테고리 관리</h2>
+        <h2 className="text-sm font-medium text-muted">카테고리 관리</h2>
         <ul className="flex flex-col gap-1">
           {categories.map((c) => (
-            <li key={c.name} className="flex items-center justify-between rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm">
+            <li key={c.name} className="flex items-center justify-between rounded-lg border border-line bg-white px-3 py-2 text-sm">
               <span>{c.name}</span>
               <div className="flex items-center gap-2 text-xs">
                 <button
                   type="button"
                   disabled={busy}
                   onClick={() => syncCategoryGit(c.name)}
-                  className="rounded-full border border-neutral-300 px-2 py-1 text-neutral-600 disabled:opacity-50"
+                  className="rounded-lg border border-line px-2 py-1 text-muted disabled:opacity-50"
                 >
                   {syncingCategory === c.name ? '동기화 중…' : '동기화'}
                 </button>
@@ -186,7 +186,7 @@ export function SettingsScreen({ onBack }: Props) {
             value={newCategoryName}
             onChange={(e) => setNewCategoryName(e.target.value)}
             placeholder="새 카테고리 이름"
-            className="flex-1 rounded-lg border border-neutral-300 px-3 py-2 text-sm"
+            className="flex-1 rounded-lg border border-line px-3 py-2 text-sm"
           />
           <button
             type="button"
@@ -196,7 +196,7 @@ export function SettingsScreen({ onBack }: Props) {
               setNewCategoryName('')
               void addCategory(name)
             }}
-            className="rounded-full bg-emerald-700 px-4 py-1.5 text-sm text-white"
+            className="rounded-lg bg-brand px-4 py-1.5 text-sm text-white"
           >
             추가
           </button>

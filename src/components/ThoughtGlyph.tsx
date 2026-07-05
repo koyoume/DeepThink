@@ -12,7 +12,7 @@ const CHECK_BASE =
 /** UI-DESIGN §3: 체크(둥근 사각 체크박스, pine) vs 코멘트(둥근 말풍선, amber) */
 export function ThoughtGlyph({ type, done, onToggle }: Props) {
   if (type === 'check') {
-    const className = `${CHECK_BASE} ${done ? 'border-emerald-700 bg-emerald-700 text-white' : 'border-neutral-300 text-transparent'}`
+    const className = `${CHECK_BASE} ${done ? 'border-brand bg-brand text-white' : 'border-faint text-transparent'}`
     if (!onToggle) {
       return (
         <span className={className} aria-hidden="true">
@@ -33,7 +33,10 @@ export function ThoughtGlyph({ type, done, onToggle }: Props) {
     )
   }
   return (
-    <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-amber-400 bg-amber-50 text-[10px] text-amber-600">
+    <span
+      className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border text-[10px]"
+      style={{ borderColor: 'var(--color-comment)', background: 'var(--color-comment-soft)', color: 'var(--color-comment)' }}
+    >
       ●
     </span>
   )

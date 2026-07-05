@@ -15,8 +15,8 @@ export function CategoryChips({ names, selected, onSelect }: Props) {
             key={name}
             type="button"
             onClick={() => onSelect(name)}
-            className={`shrink-0 rounded-full px-3 py-1.5 text-sm transition-colors ${
-              active ? 'bg-emerald-700 text-white' : 'border border-neutral-300 text-neutral-600'
+            className={`shrink-0 rounded-lg px-3 py-1.5 text-sm transition-colors ${
+              active ? 'bg-brand font-medium text-white' : 'border border-line text-muted'
             }`}
           >
             {name}

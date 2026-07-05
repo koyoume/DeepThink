@@ -34,21 +34,21 @@ export function DashboardScreen({ onOpenTopic, onOpenSettings }: Props) {
   }
 
   return (
-    <div className="mx-auto flex min-h-screen w-full max-w-2xl flex-col bg-neutral-50">
+    <div className="mx-auto flex min-h-screen w-full max-w-2xl flex-col bg-paper">
       <header className="flex items-center justify-between px-4 pt-4">
-        <h1 className="text-lg font-semibold text-neutral-900">생각 모음</h1>
+        <h1 className="font-serif text-2xl font-semibold text-ink">생각 모음</h1>
         <div className="flex gap-2">
           <button
             type="button"
             onClick={cyclePreviewLines}
-            className="rounded-full border border-neutral-300 px-3 py-1 text-xs text-neutral-600"
+            className="rounded-lg border border-line px-3 py-1 text-xs text-muted transition-colors hover:bg-brand-soft"
           >
             미리보기 {previewLines > 0 ? `${previewLines}줄` : '끔'}
           </button>
           <button
             type="button"
             onClick={onOpenSettings}
-            className="rounded-full border border-neutral-300 px-3 py-1 text-xs text-neutral-600"
+            className="rounded-lg border border-line px-3 py-1 text-xs text-muted transition-colors hover:bg-brand-soft"
           >
             설정
           </button>
@@ -57,7 +57,7 @@ export function DashboardScreen({ onOpenTopic, onOpenSettings }: Props) {
 
       <CategoryChips names={categories.map((c) => c.name)} selected={current} onSelect={selectCategory} />
 
-      <p className="px-4 pb-2 text-xs text-neutral-500">
+      <p className="px-4 pb-2 text-xs text-muted">
         주제 {shown.length}개 · 미리보기 {previewLines > 0 ? `최대 ${previewLines}줄` : '끔'}
       </p>
 
@@ -72,7 +72,7 @@ export function DashboardScreen({ onOpenTopic, onOpenSettings }: Props) {
         onClick={handleAddTopic}
         disabled={!current}
         aria-label="주제 추가"
-        className="fixed bottom-6 right-6 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-700 text-2xl text-white shadow-lg disabled:opacity-50"
+        className="fixed bottom-6 right-6 flex h-14 w-14 items-center justify-center rounded-full bg-brand text-2xl text-white shadow-lg transition-transform hover:scale-105 disabled:opacity-50"
       >
         +
       </button>
