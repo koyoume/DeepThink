@@ -1,0 +1,266 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>DeepThink 프로토타입 v1 · Outliner Ink</title>
+<!--
+  DeepThink 설계 프로토타입 v1 (Outliner Ink)
+  목적: 실제 라이브 웹앱의 시각/구조를 그대로 반영한 설계문서.
+  기준 커밋: P7 2차 강화 (배경 #F1ECE2, 카드 세리프·색 강조, 순서기반 카테고리 색).
+  구조·동작은 레거시 UI-DESIGN §4~6 고정. 상단 스위처는 문서용(실제 앱엔 없음).
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600&family=Noto+Sans+KR:wght@400;500;700&family=Noto+Serif+KR:wght@500;600;700&display=swap" />
+<style>
+  :root{
+    --paper:#F1ECE2; --surface:#FFFFFF; --ink:#211B33; --muted:#78748A; --faint:#A8A4B4;
+    --line:#ECEAE3; --guide:#E4DEF6; --brand:#6B4EFF; --brand-soft:#EDE9FF;
+    --comment:#C9803A; --comment-soft:#FBF1E6;
+    --serif:"Fraunces","Noto Serif KR",Georgia,serif;
+    --sans:"Inter","Noto Sans KR",system-ui,sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:#E4DFD5;font-family:var(--sans);color:var(--ink);
+       display:flex;flex-direction:column;align-items:center;padding:20px 12px 48px;-webkit-font-smoothing:antialiased}
+  .doc-note{font-size:12.5px;color:#7c7768;max-width:400px;text-align:center;margin:0 0 12px}
+  .switch{display:inline-flex;background:#fff;border:1px solid #d8d3c6;border-radius:11px;padding:4px;margin-bottom:14px;gap:2px}
+  .switch button{font-family:var(--sans);font-size:13px;font-weight:600;border:none;background:transparent;
+       color:#6a6578;padding:7px 14px;border-radius:8px;cursor:pointer}
+  .switch button.on{background:var(--brand);color:#fff}
+  /* phone frame */
+  .phone{width:100%;max-width:400px;height:760px;background:var(--paper);border:1px solid #d8d3c6;
+       border-radius:30px;overflow:hidden;box-shadow:0 14px 44px rgba(40,30,70,.16);display:flex;flex-direction:column;position:relative}
+  .scroll{flex:1;overflow-y:auto}
+  .scroll::-webkit-scrollbar{display:none}
+  .screen{display:none}
+  .screen.on{display:block}
+
+  /* header */
+  .hdr{display:flex;align-items:center;justify-content:space-between;padding:22px 20px 12px}
+  .hdr h1{font-family:var(--serif);font-weight:600;font-size:24px;margin:0;letter-spacing:-.01em}
+  .pill{border:1px solid var(--line);border-radius:8px;padding:6px 11px;font-size:12px;color:var(--muted);background:transparent;cursor:pointer}
+  .backbtn{border:none;background:transparent;font-size:22px;color:var(--muted);cursor:pointer;line-height:1}
+
+  /* chips */
+  .chips{display:flex;gap:8px;overflow-x:auto;padding:4px 20px 14px}
+  .chips::-webkit-scrollbar{display:none}
+  .chip{display:flex;align-items:center;gap:6px;flex:0 0 auto;border-radius:8px;padding:6px 12px;
+       font-size:13px;border:1px solid var(--line);color:var(--muted);background:transparent;cursor:pointer;white-space:nowrap}
+  .chip .dot{width:8px;height:8px;border-radius:8px;flex:0 0 auto}
+  .chip.on{border:none;color:#fff;font-weight:500}
+
+  .caption{padding:2px 20px 8px;font-size:12px;color:var(--muted)}
+
+  /* cards grid */
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;padding:0 16px 96px}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:16px;text-align:left;
+       cursor:pointer;box-shadow:0 1px 2px rgba(33,27,51,.04);transition:box-shadow .15s;display:flex;flex-direction:column;align-items:flex-start}
+  .card:hover{box-shadow:0 6px 20px rgba(107,78,255,.10)}
+  .card .title{font-family:var(--serif);font-weight:600;font-size:18px;line-height:1.25;color:var(--ink);
+       width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .card .prev{margin-top:12px;width:100%;border-top:1px solid var(--line);padding-top:12px;display:flex;flex-direction:column;gap:6px}
+  .prow{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted)}
+  .prow .txt{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .prow.done .txt{color:var(--faint);text-decoration:line-through}
+
+  /* glyphs */
+  .g-check{width:20px;height:20px;flex:0 0 auto;border-radius:6px;border:1.5px solid var(--faint);
+       display:flex;align-items:center;justify-content:center;font-size:11px;color:transparent}
+  .g-check.done{border-color:var(--brand);background:var(--brand);color:#fff}
+  .g-com{width:20px;height:20px;flex:0 0 auto;border-radius:50%;border:1px solid var(--comment);
+       background:var(--comment-soft);color:var(--comment);display:flex;align-items:center;justify-content:center;font-size:10px}
+
+  /* FAB */
+  .fab{position:absolute;bottom:24px;right:24px;width:56px;height:56px;border-radius:50%;border:none;
+       background:var(--brand);color:#fff;font-size:26px;box-shadow:0 6px 18px rgba(107,78,255,.35);cursor:pointer}
+
+  /* detail */
+  .catlabel{display:flex;align-items:center;gap:8px;padding:6px 20px 0}
+  .catlabel .dot{width:10px;height:10px;border-radius:10px}
+  .catlabel select{border:1px solid var(--line);border-radius:8px;background:var(--surface);padding:4px 10px;font-size:12px;color:var(--muted);font-family:var(--sans)}
+  .dtitle{padding:8px 20px 4px}
+  .dtitle .t{font-family:var(--serif);font-weight:600;font-size:26px;line-height:1.2;letter-spacing:-.015em;margin:0}
+  .dmeta{font-size:11px;color:var(--muted);padding:0 20px}
+  .thoughts{padding:12px 18px 96px}
+  .trow{display:flex;align-items:flex-start;gap:9px;padding:6px 0}
+  .trow .txt{font-size:15px;line-height:1.5;color:var(--ink);padding-top:1px}
+  .trow.done .txt{color:var(--faint);text-decoration:line-through}
+  .inputbar{position:absolute;left:0;right:0;bottom:0;display:flex;align-items:center;gap:8px;
+       border-top:1px solid var(--line);background:var(--surface);padding:12px}
+  .inputbar .tog{border:1px solid var(--line);border-radius:8px;padding:5px 10px;font-size:12px;color:var(--muted);background:transparent}
+  .inputbar input{flex:1;border:1px solid var(--line);border-radius:8px;background:var(--paper);padding:8px 12px;font-size:14px;color:var(--ink);outline:none;font-family:var(--sans)}
+
+  /* settings */
+  .set{padding:22px 16px 32px;display:flex;flex-direction:column;gap:22px}
+  .set h1{font-family:var(--serif);font-weight:600;font-size:26px;margin:0}
+  .sec h2{font-size:13px;font-weight:500;color:var(--muted);margin:0 0 8px}
+  .field{width:100%;border:1px solid var(--line);border-radius:10px;background:var(--surface);padding:9px 12px;font-size:14px;color:var(--ink);margin-bottom:8px;font-family:var(--sans)}
+  .btn-brand{background:var(--brand);color:#fff;border:none;border-radius:10px;padding:8px 16px;font-size:13px;cursor:pointer}
+  .btn-ghost{border:1px solid var(--line);background:transparent;color:var(--muted);border-radius:10px;padding:8px 14px;font-size:13px;cursor:pointer}
+  .prevpills{display:flex;gap:8px}
+  .prevpills button{border-radius:8px;padding:6px 12px;font-size:13px;border:1px solid var(--line);background:transparent;color:var(--muted);cursor:pointer}
+  .prevpills button.on{background:var(--brand);color:#fff;border:none}
+  .catrow{display:flex;align-items:center;justify-content:space-between;border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:9px 12px;font-size:14px;margin-bottom:6px}
+  .catrow .r{display:flex;align-items:center;gap:10px;font-size:12px;color:var(--muted)}
+  .catrow .cdot{width:11px;height:11px;border-radius:11px}
+</style>
+</head>
+<body>
+  <p class="doc-note">DeepThink 프로토타입 <b>v1 · Outliner Ink</b> — 실제 라이브 앱의 시각·구조 반영. 상단 스위처는 문서용(실제 앱엔 없음: 설정은 헤더 버튼, 상세는 카드 탭으로 진입).</p>
+  <div class="switch">
+    <button data-s="dash" class="on" onclick="show('dash',this)">대시보드</button>
+    <button data-s="detail" onclick="show('detail',this)">상세</button>
+    <button data-s="settings" onclick="show('settings',this)">설정</button>
+  </div>
+
+  <div class="phone">
+    <div class="scroll">
+      <!-- DASHBOARD -->
+      <div class="screen on" id="dash">
+        <div class="hdr">
+          <h1>생각 모음</h1>
+          <div style="display:flex;gap:8px">
+            <button class="pill" id="prevBtn" onclick="cyclePreview()">미리보기 2줄</button>
+            <button class="pill" onclick="show('settings',document.querySelector('[data-s=settings]'))">설정</button>
+          </div>
+        </div>
+        <div class="chips" id="chips"></div>
+        <div class="caption" id="caption"></div>
+        <div class="grid" id="grid"></div>
+        <button class="fab" title="주제 추가">+</button>
+      </div>
+
+      <!-- DETAIL -->
+      <div class="screen" id="detail">
+        <div class="hdr">
+          <button class="backbtn" onclick="show('dash',document.querySelector('[data-s=dash]'))">‹</button>
+          <button class="backbtn" style="font-size:20px">⋯</button>
+        </div>
+        <div class="catlabel">
+          <span class="dot" style="background:#6B4EFF"></span>
+          <select><option>아이디어</option><option>독서</option><option>프로젝트</option></select>
+        </div>
+        <div class="dtitle"><h2 class="t">글쓰기 도구의 조건</h2></div>
+        <div class="dmeta">4개의 생각 · 오늘</div>
+        <div class="thoughts">
+          <div class="trow"><span class="g-check"></span><span class="txt">도구는 사고를 방해하지 않아야 한다</span></div>
+          <div class="trow" style="margin-left:22px;border-left:2px solid var(--guide);padding-left:8px"><span class="g-check"></span><span class="txt">입력·저장 사이 마찰은 0에 가깝게</span></div>
+          <div class="trow" style="margin-left:22px;border-left:2px solid var(--guide);padding-left:8px"><span class="g-com">●</span><span class="txt">긴 글은 이 앱의 목적이 아니다</span></div>
+          <div class="trow done"><span class="g-check done">✓</span><span class="txt">한 줄이 최소 단위 — 문단은 나중에</span></div>
+        </div>
+        <div class="inputbar">
+          <button class="tog">체크</button>
+          <input placeholder="새 생각 추가" />
+        </div>
+      </div>
+
+      <!-- SETTINGS -->
+      <div class="screen" id="settings">
+        <div class="set">
+          <div class="hdr" style="padding:0"><h1>설정</h1></div>
+          <div class="sec">
+            <h2>Git 저장소</h2>
+            <input class="field" value="https://github.com/koyoume/DataHub.git" />
+            <input class="field" value="koyoume" />
+            <input class="field" type="password" value="••••••••" />
+            <button class="btn-brand">Git 설정 저장</button>
+          </div>
+          <div class="sec">
+            <h2>CORS 프록시 (브라우저 전용)</h2>
+            <input class="field" value="https://deepthink-git-proxy.koyoume.workers.dev" />
+            <button class="btn-ghost">프록시 저장</button>
+          </div>
+          <div class="sec" style="flex-direction:row;gap:8px;display:flex">
+            <button class="btn-ghost" style="flex:1">저장소 초기화 / 첫 동기화</button>
+            <button class="btn-ghost" style="flex:1">Pull</button>
+          </div>
+          <div class="sec">
+            <h2>미리보기 기본 줄 수</h2>
+            <div class="prevpills">
+              <button>끔</button><button>1줄</button><button class="on">2줄</button><button>3줄</button>
+            </div>
+          </div>
+          <div class="sec">
+            <h2>카테고리 관리</h2>
+            <div id="catmgr"></div>
+            <div style="display:flex;gap:8px;margin-top:4px">
+              <input class="field" style="flex:1;margin:0" placeholder="새 카테고리 이름" />
+              <button class="btn-brand">추가</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script>
+  const PALETTE=['#6B4EFF','#C77D3A','#2FA36B','#D8497F','#3E7CC4','#8A6FB0','#C25A4E','#4FA3A0'];
+  const CATS=['아이디어','독서','프로젝트','일기','투자'];
+  const color=i=>PALETTE[i%PALETTE.length];
+  const T={ // 카테고리별 주제
+    '아이디어':[
+      {t:'글쓰기 도구의 조건',th:[['c','사고를 방해하지 않기',0],['c','입력·저장 마찰 0',0],['m','긴 글은 목적 아님',0],['c','한 줄이 최소 단위',0]]},
+      {t:'생각 정리 앱 아이디어',th:[['c','위젯에서 바로 한 줄',0],['c','월별 자동 묶음',1]]},
+      {t:'질문 목록',th:[['m','왜 지금 이걸 하고 있지?',0],['m','안 해도 되는 일은?',0],['m','10년 뒤에도 중요한가',0]]},
+      {t:'하루 한 문장 습관',th:[['c','자기 전 한 줄이면 충분',0]]},
+    ],
+    '독서':[
+      {t:'『생각의 탄생』 메모',th:[['m','관찰은 능동적 재구성',0],['c','형상화 → 추상화 → 패턴',0]]},
+      {t:'『몰입』 재독',th:[['c','명확한 목표 + 즉각 피드백',1]]},
+    ],
+    '프로젝트':[
+      {t:'DeepThink 이식',th:[['c','PWA 설치까지 완료',1],['c','디자인 리뉴얼 진행 중',0],['m','카드 2열·색 강조',0]]},
+      {t:'DataHub 정리',th:[['c','카테고리 파일 점검',0]]},
+    ],
+    '일기':[
+      {t:'이번 주 회고',th:[['c','집중이 오후에 무너짐',0],['c','아침에 어려운 일부터',0]]},
+    ],
+    '투자':[
+      {t:'리밸런싱 메모',th:[['m','감정 배제, 규칙대로',0]]},
+    ],
+  };
+  let sel='아이디어', prev=2;
+
+  function glyph(type,done){
+    if(type==='c') return `<span class="g-check ${done?'done':''}">${done?'✓':''}</span>`;
+    return `<span class="g-com">●</span>`;
+  }
+  function renderChips(){
+    document.getElementById('chips').innerHTML=CATS.map((c,i)=>{
+      const on=c===sel;
+      return `<button class="chip ${on?'on':''}" style="${on?`background:${color(i)}`:''}" onclick="pick('${c}')">`+
+             `${on?'':`<span class="dot" style="background:${color(i)}"></span>`}${c}</button>`;
+    }).join('');
+  }
+  function renderGrid(){
+    const list=T[sel]||[];
+    document.getElementById('caption').textContent=`주제 ${list.length}개 · 미리보기 ${prev>0?`최대 ${prev}줄`:'끔'}`;
+    document.getElementById('grid').innerHTML=list.map(tp=>{
+      const p=prev>0?tp.th.slice(-prev):[];
+      const prevHtml=p.length?`<div class="prev">`+p.map(x=>{
+        const done=x[2]===1&&x[0]==='c'; // 표시용: level자리 재활용 안함 → done 별도 없음
+        return `<div class="prow"><${''}span>${glyph(x[0],false)}</span><span class="txt">${x[1]}</span></div>`;
+      }).join('')+`</div>`:'';
+      return `<div class="card" onclick="show('detail',document.querySelector('[data-s=detail]'))">`+
+             `<div class="title">${tp.t}</div>${prevHtml}</div>`;
+    }).join('');
+  }
+  function renderCatMgr(){
+    document.getElementById('catmgr').innerHTML=CATS.map((c,i)=>
+      `<div class="catrow"><span style="display:flex;align-items:center;gap:10px"><span class="cdot" style="background:${color(i)}"></span>${c}</span>`+
+      `<span class="r"><button class="btn-ghost" style="padding:5px 10px">동기화</button><span>이름변경</span><span style="color:#D8497F">삭제</span></span></div>`
+    ).join('');
+  }
+  function pick(c){sel=c;renderChips();renderGrid();}
+  function cyclePreview(){prev=prev<=0?3:prev-1;document.getElementById('prevBtn').textContent=prev>0?`미리보기 ${prev}줄`:'미리보기 끔';renderGrid();}
+  function show(id,btn){
+    document.querySelectorAll('.screen').forEach(s=>s.classList.toggle('on',s.id===id));
+    if(btn){document.querySelectorAll('.switch button').forEach(b=>b.classList.remove('on'));
+      const sw=document.querySelector(`.switch [data-s=${id}]`); if(sw)sw.classList.add('on');}
+  }
+  renderChips();renderGrid();renderCatMgr();
+</script>
+</body>
+</html>
