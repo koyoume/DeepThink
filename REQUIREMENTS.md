@@ -144,6 +144,14 @@ interface Category {
 - **구현 위치**: `store/vaultStore.ts`(`reorderCategories`/`reorderTopicsInCategory`/localStorage), `screens/useTopicDetailState.ts`(`reorderThought`/`shiftLevelBy`), `components/CategoryChips.tsx`·`screens/DashboardScreen.tsx`(칩·카드 드래그), `components/ThoughtRow.tsx`·`screens/TopicDetailScreen.tsx`(핸들 드래그).
 - **불변**: 마크다운 저장 포맷·git sync 대상 파일 구조 변경 없음(카테고리 순서는 기존 `categories.json` 재사용, 주제 순서는 기존 카테고리 `.md` 파일 내 배열 순서 재사용).
 
+### 5.2.1 카드/칩 드래그 버그 수정 — 스크롤 충돌·겹침 (2026-07-05)
+사용자 리포트: "네모 박스 간에 겹치는 문제, drag가 자연스럽지 않음. 누르면 선택한 게 잘 안 움직이고 화면 스크롤이 작동."
+- **원인 1(스크롤 충돌)**: 카드/칩에 `touch-action: manipulation`을 줘서, 롱프레스 대기 중 손가락이 살짝만 움직여도 브라우저가 그 터치를 네이티브 스크롤로 먼저 채감. 우리 JS 드래그 판정과 브라우저 스크롤이 같은 터치를 두고 경합해 카드가 안 움직이고 화면만 스크롤되는 것처럼 보였음.
+- **수정**: 카드/칩을 `touch-action: none`으로 바꿔 네이티브 제스처를 완전히 차단하고, 대신 **롱프레스 확정 전(대기 중)** 손가락 이동량만큼 직접 스크롤을 대신 넘겨줌 — 카드는 `window.scrollBy(0, -dy)`(세로), 칩은 컨테이너 `scrollBy({ left: -dx })`(가로). 롱프레스가 확정(드래그 활성화)되면 이 패스스루는 멈추고 실제 재정렬 로직으로 전환.
+- **원인 2(겹침)**: 드래그 중인 카드/칩만 둥둥 뜨고 다른 카드/칩은 제자리에 그대로 있어, 드래그 중인 것이 다른 것 위에 그냥 겹쳐 보임(이동 대상 표시 없음).
+- **수정**: 드래그 중 현재 스왑 대상(`overIndex`)에 해당하는 카드/칩에 브랜드색 2px 아웃라인으로 "여기로 이동" 표시 추가. 드래그 중인 카드/칩 자체는 그림자·약간의 스케일·투명도(0.92)로 명확히 구분.
+- 사용자 확인 전까지 §5.2와 함께 임시 항목으로 유지, 확인되면 §5.2 본문에 흡수 예정.
+
 ## 6. 비기능 요구
 - 반응형: 데스크톱/모바일 브라우저 모두 대응(원본은 모바일 전용이었으나 웹은 양쪽 지원).
 - 편집 후 400ms debounce 저장 (원본 `TopicDetailViewModel.scheduleSave` 동일 패턴).

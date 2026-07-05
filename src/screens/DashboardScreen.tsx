@@ -44,26 +44,33 @@ export function DashboardScreen({ onOpenTopic, onOpenSettings }: Props) {
   function handleCardPointerDown(id: string, e: React.PointerEvent) {
     const startX = e.clientX
     const startY = e.clientY
-    let cancelled = false
-    function onEarlyMove(ev: PointerEvent) {
-      if (Math.abs(ev.clientX - startX) > MOVE_CANCEL_PX || Math.abs(ev.clientY - startY) > MOVE_CANCEL_PX) {
-        cancelled = true
+    let lastY = e.clientY
+    let timerFired = false
+    let movedPastThreshold = false
+
+    function onMove(ev: PointerEvent) {
+      if (timerFired) return
+      // touch-action:none이라 브라우저가 이 터치로 스크롤을 안 해주므로, 롱프레스 확정 전까지는 직접 스크롤을 대신 넘겨준다.
+      const dy = ev.clientY - lastY
+      lastY = ev.clientY
+      window.scrollBy(0, -dy)
+      if (!movedPastThreshold && (Math.abs(ev.clientX - startX) > MOVE_CANCEL_PX || Math.abs(ev.clientY - startY) > MOVE_CANCEL_PX)) {
+        movedPastThreshold = true
         window.clearTimeout(timer)
-        window.removeEventListener('pointermove', onEarlyMove)
-        window.removeEventListener('pointerup', onEarlyUp)
       }
     }
-    function onEarlyUp() {
-      window.clearTimeout(timer)
-      window.removeEventListener('pointermove', onEarlyMove)
-      window.removeEventListener('pointerup', onEarlyUp)
+    function onUp() {
+      cleanup()
     }
-    window.addEventListener('pointermove', onEarlyMove)
-    window.addEventListener('pointerup', onEarlyUp)
+    function cleanup() {
+      window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('pointerup', onUp)
+    }
+    window.addEventListener('pointermove', onMove)
+    window.addEventListener('pointerup', onUp)
     const timer = window.setTimeout(() => {
-      window.removeEventListener('pointermove', onEarlyMove)
-      window.removeEventListener('pointerup', onEarlyUp)
-      if (cancelled) return
+      timerFired = true
+      cleanup()
       const centers = shown.map((t) => {
         const el = cardRefs.current.get(t.id)
         const r = el?.getBoundingClientRect()
@@ -182,6 +189,7 @@ export function DashboardScreen({ onOpenTopic, onOpenSettings }: Props) {
         <div className="grid flex-1 grid-cols-2 content-start items-start gap-3.5 px-4 pb-28">
           {shown.map((topic) => {
             const isDragging = cardDrag?.id === topic.id
+            const isDropTarget = !isDragging && cardDrag != null && shown[cardDrag.overIndex]?.id === topic.id
             return (
               <div
                 key={topic.id}
@@ -191,12 +199,16 @@ export function DashboardScreen({ onOpenTopic, onOpenSettings }: Props) {
                 }}
                 onPointerDown={(e) => handleCardPointerDown(topic.id, e)}
                 style={{
-                  touchAction: 'manipulation',
-                  transform: isDragging ? `translate(${cardDrag!.dx}px, ${cardDrag!.dy}px) scale(1.03)` : undefined,
+                  touchAction: 'none',
+                  transform: isDragging ? `translate(${cardDrag!.dx}px, ${cardDrag!.dy}px) scale(1.04)` : undefined,
                   position: isDragging ? 'relative' : undefined,
                   zIndex: isDragging ? 10 : undefined,
                   boxShadow: isDragging ? '0 12px 28px rgba(33,27,51,0.18)' : undefined,
-                  borderRadius: isDragging ? 16 : undefined,
+                  borderRadius: 16,
+                  outline: isDropTarget ? '2px solid var(--color-brand)' : undefined,
+                  outlineOffset: isDropTarget ? -2 : undefined,
+                  opacity: isDragging ? 0.92 : undefined,
+                  transition: isDragging ? undefined : 'outline-color 120ms',
                 }}
               >
                 <TopicCard

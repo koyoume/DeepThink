@@ -13,9 +13,12 @@ const MOVE_CANCEL_PX = 8
 
 /** UI-DESIGN §4: "전체" 없음, 항상 하나 선택.
  *  시각 §5.1: 활성 칩은 카테고리 색으로 채움, 비활성 칩은 색 점 + 이름.
- *  §5.2: 칩을 길게 누르면 드래그로 순서 변경(가로 1열 재정렬), 짧게 누르면 기존처럼 선택. */
+ *  §5.2: 칩을 길게 누르면 드래그로 순서 변경(가로 1열 재정렬), 짧게 누르면 기존처럼 선택.
+ *  §5.2.1: 칩은 touch-action:none(브라우저 기본 스크롤 완전 차단) — 대신 롱프레스 확정 전까지는
+ *  손가락 이동량만큼 직접 scrollLeft를 옮겨 스크롤을 대신해준다(안 그러면 롱프레스 대기 중 스크롤이 씹힘). */
 export function CategoryChips({ names, selected, onSelect, onReorder }: Props) {
   const chipRefs = useRef(new Map<string, HTMLElement>())
+  const containerRef = useRef<HTMLDivElement | null>(null)
   const suppressClick = useRef<Set<string>>(new Set())
 
   interface DragState {
@@ -29,26 +32,33 @@ export function CategoryChips({ names, selected, onSelect, onReorder }: Props) {
   function handlePointerDown(name: string, e: React.PointerEvent) {
     const startX = e.clientX
     const startY = e.clientY
-    let cancelled = false
-    function onEarlyMove(ev: PointerEvent) {
-      if (Math.abs(ev.clientX - startX) > MOVE_CANCEL_PX || Math.abs(ev.clientY - startY) > MOVE_CANCEL_PX) {
-        cancelled = true
-        cleanup()
+    let lastX = e.clientX
+    let timerFired = false
+    let movedPastThreshold = false
+
+    function onMove(ev: PointerEvent) {
+      if (timerFired) return
+      const dx = ev.clientX - lastX
+      lastX = ev.clientX
+      containerRef.current?.scrollBy({ left: -dx })
+      if (!movedPastThreshold && (Math.abs(ev.clientX - startX) > MOVE_CANCEL_PX || Math.abs(ev.clientY - startY) > MOVE_CANCEL_PX)) {
+        movedPastThreshold = true
+        window.clearTimeout(timer)
       }
     }
-    function onEarlyUp() {
+    function onUp() {
       cleanup()
     }
     function cleanup() {
-      window.clearTimeout(timer)
-      window.removeEventListener('pointermove', onEarlyMove)
-      window.removeEventListener('pointerup', onEarlyUp)
+      window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('pointerup', onUp)
     }
-    window.addEventListener('pointermove', onEarlyMove)
-    window.addEventListener('pointerup', onEarlyUp)
+    window.addEventListener('pointermove', onMove)
+    window.addEventListener('pointerup', onUp)
     const timer = window.setTimeout(() => {
+      timerFired = true
       cleanup()
-      if (cancelled || !onReorder) return
+      if (!onReorder) return
       const centers = names.map((n) => {
         const el = chipRefs.current.get(n)
         const r = el?.getBoundingClientRect()
@@ -111,11 +121,12 @@ export function CategoryChips({ names, selected, onSelect, onReorder }: Props) {
   }, [drag?.id])
 
   return (
-    <div className="flex gap-2 overflow-x-auto px-4 py-2">
+    <div ref={containerRef} className="flex gap-2 overflow-x-auto px-4 py-2">
       {names.map((name, i) => {
         const active = name === selected
         const color = categoryColorByIndex(i)
         const isDragging = drag?.id === name
+        const isDropTarget = !isDragging && drag != null && names[drag.overIndex] === name
         return (
           <button
             key={name}
@@ -131,11 +142,14 @@ export function CategoryChips({ names, selected, onSelect, onReorder }: Props) {
             }}
             className="flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm transition-colors"
             style={{
-              touchAction: 'manipulation',
+              touchAction: 'none',
               transform: isDragging ? `translateX(${drag!.dx}px) scale(1.05)` : undefined,
               position: isDragging ? 'relative' : undefined,
               zIndex: isDragging ? 10 : undefined,
               boxShadow: isDragging ? '0 6px 16px rgba(33,27,51,0.16)' : undefined,
+              outline: isDropTarget ? '2px solid var(--color-brand)' : undefined,
+              outlineOffset: isDropTarget ? -2 : undefined,
+              opacity: isDragging ? 0.92 : undefined,
               ...(active
                 ? { backgroundColor: color, color: '#fff', fontWeight: 500 }
                 : { border: '1px solid var(--color-line)', color: 'var(--color-muted)' }),
