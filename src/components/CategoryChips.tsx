@@ -1,4 +1,3 @@
-import { useRef, useState } from 'react'
 import { categoryColorByIndex } from '../domain/categoryColor.ts'
 
 interface Props {
@@ -6,203 +5,66 @@ interface Props {
   selected: string | null
   onSelect: (name: string) => void
   onReorder?: (names: string[]) => void
+  editingOrder: boolean
 }
-
-const LONG_PRESS_MS = 320
-const MOVE_CANCEL_PX = 8
-const SCROLL_DEADZONE_PX = 3
-const REORDER_MOVE_THRESHOLD = 6
 
 /** UI-DESIGN §4: "전체" 없음, 항상 하나 선택.
  *  시각 §5.1: 활성 칩은 카테고리 색으로 채움, 비활성 칩은 색 점 + 이름.
- *  §5.2: 칩을 길게 누르면 드래그로 순서 변경(가로 1열 재정렬), 짧게 누르면 기존처럼 선택.
- *  §5.2.2: 드래그 중엔 실시간으로 순서를 바꿔 다른 칩이 실제로 자리를 비켜준다(겹침 방지).
- *  스크롤 대신 넘기기는 작은 데드존(3px) 이후에만 시작 — 탭 시 미세 떨림으로 줄이 흔들리는 것 방지. */
-export function CategoryChips({ names, selected, onSelect, onReorder }: Props) {
-  const chipRefs = useRef(new Map<string, HTMLElement>())
-  const containerRef = useRef<HTMLDivElement | null>(null)
-  const suppressClick = useRef<Set<string>>(new Set())
-
-  interface DragState {
-    id: string
-    originLeft: number
-    originTop: number
-    originWidth: number
-    startClientX: number
-    dx: number
-    order: string[]
-    initialOrder: string[]
+ *  §5.3: drag 대신 "순서 편집" 모드 — 켜지면 각 칩 옆에 ◀▶ 버튼으로 즉시 순서 변경. */
+export function CategoryChips({ names, selected, onSelect, onReorder, editingOrder }: Props) {
+  function move(index: number, dir: -1 | 1) {
+    const target = index + dir
+    if (target < 0 || target >= names.length) return
+    const next = [...names]
+    ;[next[index], next[target]] = [next[target], next[index]]
+    onReorder?.(next)
   }
-  const [drag, setDrag] = useState<DragState | null>(null)
-
-  /** 롱프레스가 확정된 그 즉시(같은 틱) 드래그용 리스너까지 동기적으로 붙인다.
-   *  별도 useEffect로 분리하면 상태 반영과 리스너 부착 사이의 틈에 pointerup이 끼어들 때
-   *  아무도 못 받아서 drag가 영원히 안 풀리는 경쟁 상태(유령 칩 겹침의 원인)가 생길 수 있다. */
-  function activateChipDrag(name: string, startClientX: number) {
-    const el = chipRefs.current.get(name)
-    const r = el?.getBoundingClientRect()
-    if (!r) return
-    suppressClick.current.add(name)
-    const initialOrder = names
-    setDrag({ id: name, originLeft: r.left, originTop: r.top, originWidth: r.width, startClientX, dx: 0, order: initialOrder, initialOrder })
-
-    function onMove(e: PointerEvent) {
-      if (e.clientX === 0 && e.clientY === 0) return // 원점 좌표의 이상 이벤트 방어
-      setDrag((d) => {
-        if (!d) return d
-        const dx = e.clientX - d.startClientX
-        // 활성화 지점에서 실제로 어느 정도(6px) 움직이기 전까진 순서 재계산을 하지 않는다.
-        if (Math.abs(dx) < REORDER_MOVE_THRESHOLD) {
-          return { ...d, dx }
-        }
-        const restIds = d.order.filter((n) => n !== d.id)
-        let bestIdx = restIds.length
-        let bestDist = Infinity
-        restIds.forEach((n, i) => {
-          const chipEl = chipRefs.current.get(n)
-          const cr = chipEl?.getBoundingClientRect()
-          if (!cr) return
-          const cx = cr.left + cr.width / 2
-          const dist = Math.abs(cx - e.clientX)
-          if (dist < bestDist) {
-            bestDist = dist
-            bestIdx = i
-          }
-        })
-        const newOrder = [...restIds.slice(0, bestIdx), d.id, ...restIds.slice(bestIdx)]
-        const changed = newOrder.some((n, i) => n !== d.order[i])
-        return { ...d, dx, order: changed ? newOrder : d.order }
-      })
-    }
-    function onUp() {
-      window.removeEventListener('pointermove', onMove)
-      window.removeEventListener('pointerup', onUp)
-      window.removeEventListener('pointercancel', onUp)
-      setDrag((d) => {
-        if (d) {
-          const changed = d.order.some((n, i) => n !== d.initialOrder[i])
-          if (changed) onReorder?.(d.order)
-          window.setTimeout(() => suppressClick.current.delete(d.id), 50)
-        }
-        return null
-      })
-    }
-    window.addEventListener('pointermove', onMove)
-    window.addEventListener('pointerup', onUp)
-    window.addEventListener('pointercancel', onUp)
-  }
-
-  function handlePointerDown(name: string, e: React.PointerEvent) {
-    const startX = e.clientX
-    const startY = e.clientY
-    let lastX = e.clientX
-    let timerFired = false
-    let movedPastThreshold = false
-    let scrollStarted = false
-
-    function onMove(ev: PointerEvent) {
-      if (timerFired) return
-      const totalDx = ev.clientX - startX
-      const totalDy = ev.clientY - startY
-      if (!scrollStarted && (Math.abs(totalDx) > SCROLL_DEADZONE_PX || Math.abs(totalDy) > SCROLL_DEADZONE_PX)) {
-        scrollStarted = true
-        lastX = ev.clientX // 데드존 넘는 순간부터 다시 기준을 잡아 스크롤이 갑자기 튀지 않게 함
-      }
-      if (scrollStarted) {
-        const dx = ev.clientX - lastX
-        lastX = ev.clientX
-        containerRef.current?.scrollBy({ left: -dx })
-      }
-      if (!movedPastThreshold && (Math.abs(totalDx) > MOVE_CANCEL_PX || Math.abs(totalDy) > MOVE_CANCEL_PX)) {
-        movedPastThreshold = true
-        window.clearTimeout(timer)
-      }
-    }
-    function onUp() {
-      window.clearTimeout(timer)
-      cleanup()
-    }
-    function cleanup() {
-      window.removeEventListener('pointermove', onMove)
-      window.removeEventListener('pointerup', onUp)
-      window.removeEventListener('pointercancel', onUp)
-    }
-    window.addEventListener('pointermove', onMove)
-    window.addEventListener('pointerup', onUp)
-    window.addEventListener('pointercancel', onUp)
-    const timer = window.setTimeout(() => {
-      timerFired = true
-      cleanup()
-      if (!onReorder) return
-      activateChipDrag(name, lastX)
-    }, LONG_PRESS_MS)
-  }
-
-  const displayNames = drag ? drag.order.filter((n) => n !== drag.id) : names
 
   return (
-    <div ref={containerRef} className="relative flex gap-2 overflow-x-auto px-4 py-2">
-      {displayNames.map((name) => {
-        const i = names.indexOf(name)
+    <div className="flex gap-2 overflow-x-auto px-4 py-2">
+      {names.map((name, i) => {
         const active = name === selected
         const color = categoryColorByIndex(i)
         return (
-          <button
-            key={name}
-            type="button"
-            ref={(el) => {
-              if (el) chipRefs.current.set(name, el)
-              else chipRefs.current.delete(name)
-            }}
-            onPointerDown={(e) => handlePointerDown(name, e)}
-            onClick={() => {
-              if (suppressClick.current.has(name)) return
-              onSelect(name)
-            }}
-            className="flex shrink-0 select-none items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm transition-colors"
-            style={{
-              touchAction: 'none',
-              WebkitTouchCallout: 'none',
-              WebkitUserSelect: 'none',
-              ...(active
-                ? { backgroundColor: color, color: '#fff', fontWeight: 500 }
-                : { border: '1px solid var(--color-line)', color: 'var(--color-muted)' }),
-            }}
-          >
-            {!active && <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: color }} />}
-            {name}
-          </button>
+          <div key={name} className="flex shrink-0 items-center gap-0.5">
+            {editingOrder && (
+              <button
+                type="button"
+                aria-label={`${name} 왼쪽으로 이동`}
+                disabled={i === 0}
+                onClick={() => move(i, -1)}
+                className="rounded px-1 text-sm text-muted disabled:opacity-30"
+              >
+                ◀
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => onSelect(name)}
+              className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm transition-colors"
+              style={
+                active
+                  ? { backgroundColor: color, color: '#fff', fontWeight: 500 }
+                  : { border: '1px solid var(--color-line)', color: 'var(--color-muted)' }
+              }
+            >
+              {!active && <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: color }} />}
+              {name}
+            </button>
+            {editingOrder && (
+              <button
+                type="button"
+                aria-label={`${name} 오른쪽으로 이동`}
+                disabled={i === names.length - 1}
+                onClick={() => move(i, 1)}
+                className="rounded px-1 text-sm text-muted disabled:opacity-30"
+              >
+                ▶
+              </button>
+            )}
+          </div>
         )
       })}
-      {drag && (
-        <button
-          type="button"
-          style={{
-            position: 'fixed',
-            left: drag.originLeft + drag.dx,
-            top: drag.originTop,
-            width: drag.originWidth,
-            zIndex: 50,
-            pointerEvents: 'none',
-            boxShadow: '0 6px 16px rgba(33,27,51,0.2)',
-            transform: 'scale(1.05)',
-            opacity: 0.95,
-            ...(drag.id === selected
-              ? { backgroundColor: categoryColorByIndex(names.indexOf(drag.id)), color: '#fff', fontWeight: 500 }
-              : { border: '1px solid var(--color-line)', color: 'var(--color-muted)', backgroundColor: 'var(--color-surface)' }),
-          }}
-          className="flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm"
-          data-drag-ghost
-        >
-          {drag.id !== selected && (
-            <span
-              className="h-2 w-2 shrink-0 rounded-full"
-              style={{ backgroundColor: categoryColorByIndex(names.indexOf(drag.id)) }}
-            />
-          )}
-          {drag.id}
-        </button>
-      )}
     </div>
   )
 }
