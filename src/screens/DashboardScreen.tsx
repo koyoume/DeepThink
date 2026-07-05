@@ -8,6 +8,7 @@ import { useGitStore } from '../store/gitStore.ts'
 const LONG_PRESS_MS = 320
 const MOVE_CANCEL_PX = 8
 const REORDER_MOVE_THRESHOLD = 6
+const EDGE_MARGIN_PX = 96
 
 interface Props {
   onOpenTopic: (id: string) => void
@@ -121,6 +122,12 @@ export function DashboardScreen({ onOpenTopic, onOpenSettings }: Props) {
   }
 
   function handleCardPointerDown(id: string, e: React.PointerEvent) {
+    // 화면 맨 아래 엣지 근처를 누르면 모바일 OS가 홈/뒤로가기 제스처로 먼저 가로채 드래그가
+    // 시작하자마자 풀릴 수 있다. 롱프레스 타이머가 돌기 전에 살짝 위로 스크롤해 여유를 만든다.
+    const distanceFromBottom = window.innerHeight - e.clientY
+    if (distanceFromBottom < EDGE_MARGIN_PX) {
+      window.scrollBy({ top: EDGE_MARGIN_PX - distanceFromBottom })
+    }
     const startX = e.clientX
     const startY = e.clientY
     let lastX = e.clientX
