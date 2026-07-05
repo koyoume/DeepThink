@@ -1,6 +1,5 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { ThoughtRow } from '../components/ThoughtRow.tsx'
-import { EmptyState } from '../components/EmptyState.tsx'
 import { Loading } from '../components/Loading.tsx'
 import { useAutoFitFontSize } from '../components/useAutoFit.ts'
 import { categoryColorByName } from '../domain/categoryColor.ts'
@@ -16,8 +15,15 @@ interface Props {
 export function TopicDetailScreen({ topicId, onBack }: Props) {
   const categories = useVaultStore((s) => s.categories)
   const detail = useTopicDetailState(topicId)
+
+  // 하단 입력바 없이 일반 에디터처럼 동작: 목록이 완전히 비면(첫 진입 포함) 커서 둘 빈 줄 하나를 자동으로 만든다.
+  useEffect(() => {
+    if (detail.state.loaded && detail.state.thoughts.length === 0) {
+      detail.addAtEnd()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [detail.state.loaded, detail.state.thoughts.length])
   const [menuOpen, setMenuOpen] = useState(false)
-  const [draft, setDraft] = useState('')
 
   const LONG_PRESS_MS = 320
   const MOVE_CANCEL_PX = 8
@@ -157,14 +163,6 @@ export function TopicDetailScreen({ topicId, onBack }: Props) {
     onBack()
   }
 
-  function submitDraft() {
-    const text = draft.trim()
-    setDraft('')
-    if (!text) return
-    const id = detail.addAtEnd()
-    detail.setText(id, text)
-  }
-
   return (
     <div className="mx-auto flex min-h-screen w-full max-w-2xl flex-col bg-paper">
       <header className="flex items-center justify-between px-4 pt-4">
@@ -241,14 +239,7 @@ export function TopicDetailScreen({ topicId, onBack }: Props) {
         </div>
       )}
 
-      <div className="flex-1 px-4 pb-24 pt-3">
-        {detail.state.thoughts.length === 0 && (
-          <EmptyState
-            title="첫 생각을 적어보세요"
-            hint="아래 입력창에 한 줄씩 생각을 더할 수 있어요."
-            glyph="●"
-          />
-        )}
+      <div className="flex-1 px-4 pb-8 pt-3">
         {detail.state.thoughts.map((t) => {
           const isDragging = drag?.id === t.id
           return (
@@ -299,22 +290,6 @@ export function TopicDetailScreen({ topicId, onBack }: Props) {
           <div style={{ borderTop: '2px solid var(--color-brand)', height: 0 }} />
         )}
       </div>
-
-      <footer className="fixed bottom-0 left-1/2 flex w-full max-w-2xl -translate-x-1/2 items-center gap-2 border-t border-line bg-surface p-3">
-        <input
-          type="text"
-          value={draft}
-          placeholder="새 생각 추가"
-          onChange={(e) => setDraft(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') {
-              e.preventDefault()
-              submitDraft()
-            }
-          }}
-          className="flex-1 rounded-lg border border-line bg-paper px-3 py-1.5 text-sm text-ink outline-none focus:border-brand"
-        />
-      </footer>
     </div>
   )
 }
