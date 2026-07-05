@@ -61,7 +61,7 @@ export function DashboardScreen({ onOpenTopic, onOpenSettings }: Props) {
         주제 {shown.length}개 · 미리보기 {previewLines > 0 ? `최대 ${previewLines}줄` : '끔'}
       </p>
 
-      <div className="grid flex-1 grid-cols-2 gap-3.5 px-4 pb-28">
+      <div className="grid flex-1 grid-cols-2 content-start items-start gap-3.5 px-4 pb-28">
         {shown.map((topic) => (
           <TopicCard key={topic.id} topic={topic} previewLines={previewLines} onOpen={() => onOpenTopic(topic.id)} />
         ))}

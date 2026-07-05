@@ -105,6 +105,12 @@ interface Category {
 - **카테고리 색 = 순서 기반 팔레트**(`src/domain/categoryColor.ts`, 8색). 모델에 색 필드가 없어 카테고리 배열 index로 결정론적 배정(이름 변경/추가에도 안정). **활성 칩=카테고리 색 채움**, 비활성 칩=색 점+이름, 상세 화면 카테고리 라벨=색 점.
 - 완료 체크·FAB는 브랜드 보라 유지(카테고리 색과 역할 구분).
 
+### 5.1.2 카드 높이 = content-driven (2026-07-05, 버그 수정)
+**규칙**: 홈 2열 그리드의 각 카드 높이는 **자기 노출 내용(제목 + 미리보기 N줄)에만** 맞춘다. 행/컨테이너에 맞춰 늘어나지 않는다.
+- 버그: 카드 그리드 컨테이너가 `grid grid-cols-2`만 지정 → CSS Grid 기본값 `align-items: stretch`로 **같은 행의 짧은 카드가 옆의 긴 카드 높이로 늘어남**. 추가로 `flex-1`이 컨테이너를 화면 높이로 키우면서 기본 `align-content: stretch`가 행 트랙까지 세로로 부풀림 → 카드가 노출 내용보다 크게 보임.
+- 수정: 그리드 컨테이너에 `content-start items-start` 추가(`align-content/​items: flex-start`). `items-start`=카드가 행 이웃에 안 끌려감, `content-start`=행이 위로 모여 트랙이 안 늘어남. `flex-1`은 스크롤 영역 확보용으로 유지(빈 공간만 아래로).
+- 불변: 동작·데이터·2열 배치 그대로. 순수 레이아웃 수정.
+
 ## 6. 비기능 요구
 - 반응형: 데스크톱/모바일 브라우저 모두 대응(원본은 모바일 전용이었으나 웹은 양쪽 지원).
 - 편집 후 400ms debounce 저장 (원본 `TopicDetailViewModel.scheduleSave` 동일 패턴).
