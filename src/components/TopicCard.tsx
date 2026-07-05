@@ -1,6 +1,7 @@
 import type { Topic } from '../domain/models.ts'
 import { useAutoFitFontSize } from './useAutoFit.ts'
 import { ThoughtGlyph } from './ThoughtGlyph.tsx'
+import { renderInlineFormatted } from '../domain/inlineFormat.tsx'
 
 interface Props {
   topic: Topic
@@ -32,7 +33,7 @@ export function TopicCard({ topic, previewLines, onOpen }: Props) {
             <div key={t.id} className="flex items-center gap-2 text-xs text-muted">
               <ThoughtGlyph type={t.type} done={t.done} />
               <span className={`truncate ${t.type === 'check' && t.done ? 'text-faint line-through' : ''}`}>
-                {t.text || ' '}
+                {t.text ? renderInlineFormatted(t.text) : ' '}
               </span>
             </div>
           ))}

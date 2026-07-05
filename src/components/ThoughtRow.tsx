@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { Thought } from '../domain/models.ts'
 import { ThoughtGlyph } from './ThoughtGlyph.tsx'
+import { renderInlineFormatted } from '../domain/inlineFormat.tsx'
 
 interface Props {
   thought: Thought
@@ -25,6 +26,7 @@ export function ThoughtRow(props: Props) {
   const { thought } = props
   const inputRef = useRef<HTMLInputElement | null>(null)
   const [menuOpen, setMenuOpen] = useState(false)
+  const [focused, setFocused] = useState(false)
   const pointer = useRef<{ x: number; y: number; active: boolean } | null>(null)
 
   const onFocusHandled = props.onFocusHandled
@@ -34,6 +36,21 @@ export function ThoughtRow(props: Props) {
       onFocusHandled()
     }
   }, [props.focusRequested, onFocusHandled])
+
+  // 렌더 뷰(blur 상태)를 클릭해 편집 모드로 전환할 때, input이 막 마운트된 뒤 포커스를 옮긴다.
+  useEffect(() => {
+    if (focused) inputRef.current?.focus()
+  }, [focused])
+
+  function handleFocus() {
+    props.onFocus()
+    setFocused(true)
+  }
+
+  function handleBlur() {
+    props.onBlur()
+    setFocused(false)
+  }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
     if (e.key === 'Enter') {
@@ -75,19 +92,31 @@ export function ThoughtRow(props: Props) {
       onPointerUp={handlePointerUp}
     >
       <ThoughtGlyph type={thought.type} done={thought.done} onToggle={props.onToggleDone} />
-      <input
-        ref={inputRef}
-        type="text"
-        value={thought.text}
-        placeholder="생각을 입력하세요"
-        onChange={(e) => props.onTextChange(e.target.value)}
-        onKeyDown={handleKeyDown}
-        onFocus={props.onFocus}
-        onBlur={props.onBlur}
-        className={`min-w-0 flex-1 bg-transparent text-sm outline-none ${
-          thought.type === 'check' && thought.done ? 'text-faint line-through' : 'text-ink'
-        }`}
-      />
+      {!focused && thought.text.trim() !== '' ? (
+        <button
+          type="button"
+          onClick={() => setFocused(true)}
+          className={`min-w-0 flex-1 truncate bg-transparent text-left text-sm outline-none ${
+            thought.type === 'check' && thought.done ? 'text-faint line-through' : 'text-ink'
+          }`}
+        >
+          {renderInlineFormatted(thought.text)}
+        </button>
+      ) : (
+        <input
+          ref={inputRef}
+          type="text"
+          value={thought.text}
+          placeholder="생각을 입력하세요"
+          onChange={(e) => props.onTextChange(e.target.value)}
+          onKeyDown={handleKeyDown}
+          onFocus={handleFocus}
+          onBlur={handleBlur}
+          className={`min-w-0 flex-1 bg-transparent text-sm outline-none ${
+            thought.type === 'check' && thought.done ? 'text-faint line-through' : 'text-ink'
+          }`}
+        />
+      )}
       <div className="relative">
         <button
           type="button"
