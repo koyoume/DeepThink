@@ -41,9 +41,11 @@ test('dashboard → detail → settings core flow', async ({ page }) => {
   await test.step('Tab indents the focused thought row one level', async () => {
     const lastRow = page.locator(THOUGHT_INPUT).last()
     await lastRow.focus()
+    const marginBefore = await lastRow.evaluate((el) => parseFloat(getComputedStyle(el.closest('.group')!).marginLeft))
     await page.keyboard.press('Tab')
-    const marginLeft = await lastRow.evaluate((el) => getComputedStyle(el.closest('.group')!).marginLeft)
-    expect(marginLeft).toBe('22px')
+    const marginAfter = await lastRow.evaluate((el) => parseFloat(getComputedStyle(el.closest('.group')!).marginLeft))
+    // 새 줄은 Enter를 누른 줄의 레벨을 상속하므로 절대값이 아니라 "한 단계만큼(22px)" 증가했는지로 검증한다.
+    expect(marginAfter - marginBefore).toBe(22)
   })
 
   await test.step('back button returns to dashboard, and the reload survives (IndexedDB flush)', async () => {
