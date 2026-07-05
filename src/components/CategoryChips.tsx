@@ -11,6 +11,7 @@ interface Props {
 const LONG_PRESS_MS = 320
 const MOVE_CANCEL_PX = 8
 const SCROLL_DEADZONE_PX = 3
+const REORDER_MOVE_THRESHOLD = 6
 
 /** UI-DESIGN §4: "전체" 없음, 항상 하나 선택.
  *  시각 §5.1: 활성 칩은 카테고리 색으로 채움, 비활성 칩은 색 점 + 이름.
@@ -46,9 +47,14 @@ export function CategoryChips({ names, selected, onSelect, onReorder }: Props) {
     setDrag({ id: name, originLeft: r.left, originTop: r.top, originWidth: r.width, startClientX, dx: 0, order: initialOrder, initialOrder })
 
     function onMove(e: PointerEvent) {
+      if (e.clientX === 0 && e.clientY === 0) return // 원점 좌표의 이상 이벤트 방어
       setDrag((d) => {
         if (!d) return d
         const dx = e.clientX - d.startClientX
+        // 활성화 지점에서 실제로 어느 정도(6px) 움직이기 전까진 순서 재계산을 하지 않는다.
+        if (Math.abs(dx) < REORDER_MOVE_THRESHOLD) {
+          return { ...d, dx }
+        }
         const restIds = d.order.filter((n) => n !== d.id)
         let bestIdx = restIds.length
         let bestDist = Infinity

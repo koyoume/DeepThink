@@ -7,6 +7,7 @@ import { useGitStore } from '../store/gitStore.ts'
 
 const LONG_PRESS_MS = 320
 const MOVE_CANCEL_PX = 8
+const REORDER_MOVE_THRESHOLD = 6
 
 interface Props {
   onOpenTopic: (id: string) => void
@@ -71,10 +72,16 @@ export function DashboardScreen({ onOpenTopic, onOpenSettings }: Props) {
     })
 
     function onMove(e: PointerEvent) {
+      if (e.clientX === 0 && e.clientY === 0) return // 원점 좌표의 이상 이벤트 방어
       setCardDrag((d) => {
         if (!d) return d
         const dx = e.clientX - d.startClientX
         const dy = e.clientY - d.startClientY
+        // 활성화 지점에서 실제로 어느 정도(6px) 움직이기 전까진 순서 재계산을 하지 않는다.
+        // 활성화 직후의 미세한 지터/합성 이벤트 하나 때문에 즉시 엉뚱한 위치로 튀는 것을 방지.
+        if (Math.hypot(dx, dy) < REORDER_MOVE_THRESHOLD) {
+          return { ...d, dx, dy }
+        }
         const restIds = d.order.filter((cid) => cid !== d.id)
         let bestIdx = restIds.length
         let bestDist = Infinity
