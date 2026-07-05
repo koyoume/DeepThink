@@ -83,6 +83,7 @@ export function ThoughtRow(props: Props) {
       {!focused && !props.focusRequested && thought.text.trim() !== '' ? (
         <button
           type="button"
+          data-testid="thought-view"
           onClick={() => setFocused(true)}
           className={`min-w-0 flex-1 truncate bg-transparent text-left text-sm outline-none ${
             thought.type === 'check' && thought.done ? 'text-faint line-through' : 'text-ink'
@@ -94,6 +95,7 @@ export function ThoughtRow(props: Props) {
         <input
           ref={inputRef}
           type="text"
+          data-testid="thought-input"
           value={thought.text}
           placeholder="생각을 입력하세요"
           onChange={(e) => props.onTextChange(e.target.value)}
