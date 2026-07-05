@@ -10,8 +10,7 @@ interface Props {
   onFocus: () => void
   onBlur: () => void
   onTextChange: (text: string) => void
-  onToggleDone: () => void
-  onToggleType: () => void
+  onCycleType: () => void
   onEnter: () => void
   onBackspaceAtStart: () => void
   onIndent: () => void
@@ -80,7 +79,7 @@ export function ThoughtRow(props: Props) {
       >
         ⠿
       </span>
-      <ThoughtGlyph type={thought.type} done={thought.done} onToggle={props.onToggleDone} />
+      <ThoughtGlyph type={thought.type} done={thought.done} onCycle={props.onCycleType} />
       {!focused && !props.focusRequested && thought.text.trim() !== '' ? (
         <button
           type="button"
@@ -117,16 +116,6 @@ export function ThoughtRow(props: Props) {
         </button>
         {menuOpen && (
           <div className="absolute right-0 z-10 mt-1 w-32 rounded-lg border border-line bg-surface py-1 text-sm shadow-lg">
-            <button
-              type="button"
-              className="block w-full px-3 py-1.5 text-left hover:bg-brand-soft"
-              onClick={() => {
-                props.onToggleType()
-                setMenuOpen(false)
-              }}
-            >
-              {thought.type === 'check' ? '코멘트로 전환' : '체크로 전환'}
-            </button>
             <button
               type="button"
               className="block w-full px-3 py-1.5 text-left hover:bg-brand-soft"

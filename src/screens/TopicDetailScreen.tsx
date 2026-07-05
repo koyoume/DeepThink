@@ -283,8 +283,7 @@ export function TopicDetailScreen({ topicId, onBack }: Props) {
                 onFocus={() => detail.setFocused(t.id)}
                 onBlur={() => detail.clearFocused(t.id)}
                 onTextChange={(text) => detail.setText(t.id, text)}
-                onToggleDone={() => detail.toggleDone(t.id)}
-                onToggleType={() => detail.setType(t.id, t.type === 'check' ? 'comment' : 'check')}
+                onCycleType={() => detail.cycleType(t.id)}
                 onEnter={() => detail.addAfter(t.id)}
                 onBackspaceAtStart={() => {
                   if (t.text === '') detail.deleteThought(t.id)
@@ -302,13 +301,6 @@ export function TopicDetailScreen({ topicId, onBack }: Props) {
       </div>
 
       <footer className="fixed bottom-0 left-1/2 flex w-full max-w-2xl -translate-x-1/2 items-center gap-2 border-t border-line bg-surface p-3">
-        <button
-          type="button"
-          onClick={detail.toggleNewType}
-          className="shrink-0 rounded-lg border border-line px-2.5 py-1 text-xs text-muted"
-        >
-          {detail.newType === 'check' ? '체크' : '코멘트'}
-        </button>
         <input
           type="text"
           value={draft}

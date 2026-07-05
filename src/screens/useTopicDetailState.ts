@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { MAX_THOUGHT_LEVEL, type Material, type Thought, type ThoughtType } from '../domain/models.ts'
+import { MAX_THOUGHT_LEVEL, type Material, type Thought } from '../domain/models.ts'
 import { useVaultStore } from '../store/vaultStore.ts'
 
 /**
@@ -31,7 +31,6 @@ export function useTopicDetailState(topicId: string) {
     materials: [],
     thoughts: [],
   })
-  const [newType, setNewType] = useState<ThoughtType>('check')
   const [focusedId, setFocusedId] = useState<string | null>(null)
   const [focusRequest, setFocusRequest] = useState<string | null>(null)
 
@@ -80,30 +79,16 @@ export function useTopicDetailState(topicId: string) {
     update((s) => ({ ...s, thoughts: s.thoughts.map((t) => (t.id === id ? { ...t, text } : t)) }))
   }
 
-  function toggleDone(id: string) {
+  function cycleType(id: string) {
     update((s) => ({
       ...s,
-      thoughts: s.thoughts.map((t) => (t.id === id && t.type === 'check' ? { ...t, done: !t.done } : t)),
+      thoughts: s.thoughts.map((t) => {
+        if (t.id !== id) return t
+        if (t.type === 'comment') return { ...t, type: 'check', done: false }
+        if (t.type === 'check' && !t.done) return { ...t, done: true }
+        return { ...t, type: 'comment', done: false }
+      }),
     }))
-  }
-
-  function setType(id: string, type: ThoughtType) {
-    update((s) => ({
-      ...s,
-      thoughts: s.thoughts.map((t) => (t.id === id ? { ...t, type, done: type === 'comment' ? false : t.done } : t)),
-    }))
-  }
-
-  function toggleNewType() {
-    setNewType((t) => (t === 'check' ? 'comment' : 'check'))
-  }
-
-  /** 입력바 타입 토글: 편집 중인 줄이 있으면 그 줄에 반영, 없으면 새 줄 기본 타입만 변경 */
-  function toggleType() {
-    const target = focusedId ? state.thoughts.find((t) => t.id === focusedId)?.type : undefined
-    const next: ThoughtType = (target ?? newType) === 'check' ? 'comment' : 'check'
-    setNewType(next)
-    if (focusedId) setType(focusedId, next)
   }
 
   /** id 줄 바로 아래에 같은 레벨·타입 새 줄 삽입, 새 줄 id 반환 */
@@ -121,9 +106,9 @@ export function useTopicDetailState(topicId: string) {
     return inserted.id
   }
 
-  /** 입력바: 맨 아래 level0 새 줄 추가, 새 줄 id 반환 */
+  /** 입력바: 맨 아래 level0 새 줄 추가(체크 미완료로 시작 — 왼쪽 글리프 클릭으로 필요시 순환), 새 줄 id 반환 */
   function addAtEnd(): string {
-    const inserted: Thought = { id: newThoughtId(), type: newType, level: 0, text: '', done: false }
+    const inserted: Thought = { id: newThoughtId(), type: 'check', level: 0, text: '', done: false }
     update((s) => ({ ...s, thoughts: [...s.thoughts, inserted] }))
     setFocusRequest(inserted.id)
     return inserted.id
@@ -218,7 +203,6 @@ export function useTopicDetailState(topicId: string) {
 
   return {
     state,
-    newType,
     focusedId,
     focusRequest,
     setFocused: setFocusedId,
@@ -226,10 +210,7 @@ export function useTopicDetailState(topicId: string) {
     clearFocusRequest,
     setTitle,
     setText,
-    toggleDone,
-    setType,
-    toggleNewType,
-    toggleType,
+    cycleType,
     addAfter,
     addAtEnd,
     deleteThought,
