@@ -10,12 +10,13 @@ interface Props {
 
 const LONG_PRESS_MS = 320
 const MOVE_CANCEL_PX = 8
+const SCROLL_DEADZONE_PX = 3
 
 /** UI-DESIGN §4: "전체" 없음, 항상 하나 선택.
  *  시각 §5.1: 활성 칩은 카테고리 색으로 채움, 비활성 칩은 색 점 + 이름.
  *  §5.2: 칩을 길게 누르면 드래그로 순서 변경(가로 1열 재정렬), 짧게 누르면 기존처럼 선택.
- *  §5.2.1: 칩은 touch-action:none(브라우저 기본 스크롤 완전 차단) — 대신 롱프레스 확정 전까지는
- *  손가락 이동량만큼 직접 scrollLeft를 옮겨 스크롤을 대신해준다(안 그러면 롱프레스 대기 중 스크롤이 씹힘). */
+ *  §5.2.2: 드래그 중엔 실시간으로 순서를 바꿔 다른 칩이 실제로 자리를 비켜준다(겹침 방지).
+ *  스크롤 대신 넘기기는 작은 데드존(3px) 이후에만 시작 — 탭 시 미세 떨림으로 줄이 흔들리는 것 방지. */
 export function CategoryChips({ names, selected, onSelect, onReorder }: Props) {
   const chipRefs = useRef(new Map<string, HTMLElement>())
   const containerRef = useRef<HTMLDivElement | null>(null)
@@ -23,9 +24,12 @@ export function CategoryChips({ names, selected, onSelect, onReorder }: Props) {
 
   interface DragState {
     id: string
+    originLeft: number
+    originTop: number
+    originWidth: number
+    startClientX: number
     dx: number
-    overIndex: number
-    centers: { name: string; cx: number }[]
+    order: string[]
   }
   const [drag, setDrag] = useState<DragState | null>(null)
 
@@ -35,13 +39,22 @@ export function CategoryChips({ names, selected, onSelect, onReorder }: Props) {
     let lastX = e.clientX
     let timerFired = false
     let movedPastThreshold = false
+    let scrollStarted = false
 
     function onMove(ev: PointerEvent) {
       if (timerFired) return
-      const dx = ev.clientX - lastX
-      lastX = ev.clientX
-      containerRef.current?.scrollBy({ left: -dx })
-      if (!movedPastThreshold && (Math.abs(ev.clientX - startX) > MOVE_CANCEL_PX || Math.abs(ev.clientY - startY) > MOVE_CANCEL_PX)) {
+      const totalDx = ev.clientX - startX
+      const totalDy = ev.clientY - startY
+      if (!scrollStarted && (Math.abs(totalDx) > SCROLL_DEADZONE_PX || Math.abs(totalDy) > SCROLL_DEADZONE_PX)) {
+        scrollStarted = true
+        lastX = ev.clientX // 데드존 넘는 순간부터 다시 기준을 잡아 스크롤이 갑자기 튀지 않게 함
+      }
+      if (scrollStarted) {
+        const dx = ev.clientX - lastX
+        lastX = ev.clientX
+        containerRef.current?.scrollBy({ left: -dx })
+      }
+      if (!movedPastThreshold && (Math.abs(totalDx) > MOVE_CANCEL_PX || Math.abs(totalDy) > MOVE_CANCEL_PX)) {
         movedPastThreshold = true
         window.clearTimeout(timer)
       }
@@ -59,53 +72,44 @@ export function CategoryChips({ names, selected, onSelect, onReorder }: Props) {
       timerFired = true
       cleanup()
       if (!onReorder) return
-      const centers = names.map((n) => {
-        const el = chipRefs.current.get(n)
-        const r = el?.getBoundingClientRect()
-        return { name: n, cx: r ? r.left + r.width / 2 : 0 }
-      })
-      const overIndex = names.indexOf(name)
+      const el = chipRefs.current.get(name)
+      const r = el?.getBoundingClientRect()
+      if (!r) return
       suppressClick.current.add(name)
-      setDrag({ id: name, dx: 0, overIndex, centers })
+      setDrag({ id: name, originLeft: r.left, originTop: r.top, originWidth: r.width, startClientX: lastX, dx: 0, order: names })
     }, LONG_PRESS_MS)
   }
 
   useEffect(() => {
     if (!drag) return
-    const origin = drag.centers.find((c) => c.name === drag.id)
-    const startX = origin?.cx ?? 0
-
-    function nearestIndex(x: number, centers: DragState['centers']): number {
-      let best = 0
-      let bestDist = Infinity
-      centers.forEach((c, i) => {
-        const d = Math.abs(c.cx - x)
-        if (d < bestDist) {
-          bestDist = d
-          best = i
-        }
-      })
-      return best
-    }
-
     function onMove(e: PointerEvent) {
       setDrag((d) => {
         if (!d) return d
-        const dx = e.clientX - startX
-        const overIndex = nearestIndex(e.clientX, d.centers)
-        return { ...d, dx, overIndex }
+        const dx = e.clientX - d.startClientX
+        const restIds = d.order.filter((n) => n !== d.id)
+        let bestIdx = restIds.length
+        let bestDist = Infinity
+        restIds.forEach((n, i) => {
+          const el = chipRefs.current.get(n)
+          const r = el?.getBoundingClientRect()
+          if (!r) return
+          const cx = r.left + r.width / 2
+          const dist = Math.abs(cx - e.clientX)
+          if (dist < bestDist) {
+            bestDist = dist
+            bestIdx = i
+          }
+        })
+        const newOrder = [...restIds.slice(0, bestIdx), d.id, ...restIds.slice(bestIdx)]
+        const changed = newOrder.some((n, i) => n !== d.order[i])
+        return { ...d, dx, order: changed ? newOrder : d.order }
       })
     }
     function onUp() {
       setDrag((d) => {
         if (d) {
-          const originalIndex = d.centers.findIndex((c) => c.name === d.id)
-          if (d.overIndex !== originalIndex) {
-            const order = d.centers.map((c) => c.name)
-            const [moved] = order.splice(originalIndex, 1)
-            order.splice(d.overIndex, 0, moved)
-            onReorder?.(order)
-          }
+          const changed = d.order.some((n, i) => n !== names[i])
+          if (changed) onReorder?.(d.order)
           window.setTimeout(() => suppressClick.current.delete(d.id), 50)
         }
         return null
@@ -120,13 +124,14 @@ export function CategoryChips({ names, selected, onSelect, onReorder }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [drag?.id])
 
+  const displayNames = drag ? drag.order.filter((n) => n !== drag.id) : names
+
   return (
-    <div ref={containerRef} className="flex gap-2 overflow-x-auto px-4 py-2">
-      {names.map((name, i) => {
+    <div ref={containerRef} className="relative flex gap-2 overflow-x-auto px-4 py-2">
+      {displayNames.map((name) => {
+        const i = names.indexOf(name)
         const active = name === selected
         const color = categoryColorByIndex(i)
-        const isDragging = drag?.id === name
-        const isDropTarget = !isDragging && drag != null && names[drag.overIndex] === name
         return (
           <button
             key={name}
@@ -140,16 +145,11 @@ export function CategoryChips({ names, selected, onSelect, onReorder }: Props) {
               if (suppressClick.current.has(name)) return
               onSelect(name)
             }}
-            className="flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm transition-colors"
+            className="flex shrink-0 select-none items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm transition-colors"
             style={{
               touchAction: 'none',
-              transform: isDragging ? `translateX(${drag!.dx}px) scale(1.05)` : undefined,
-              position: isDragging ? 'relative' : undefined,
-              zIndex: isDragging ? 10 : undefined,
-              boxShadow: isDragging ? '0 6px 16px rgba(33,27,51,0.16)' : undefined,
-              outline: isDropTarget ? '2px solid var(--color-brand)' : undefined,
-              outlineOffset: isDropTarget ? -2 : undefined,
-              opacity: isDragging ? 0.92 : undefined,
+              WebkitTouchCallout: 'none',
+              WebkitUserSelect: 'none',
               ...(active
                 ? { backgroundColor: color, color: '#fff', fontWeight: 500 }
                 : { border: '1px solid var(--color-line)', color: 'var(--color-muted)' }),
@@ -160,6 +160,35 @@ export function CategoryChips({ names, selected, onSelect, onReorder }: Props) {
           </button>
         )
       })}
+      {drag && (
+        <button
+          type="button"
+          style={{
+            position: 'fixed',
+            left: drag.originLeft + drag.dx,
+            top: drag.originTop,
+            width: drag.originWidth,
+            zIndex: 50,
+            pointerEvents: 'none',
+            boxShadow: '0 6px 16px rgba(33,27,51,0.2)',
+            transform: 'scale(1.05)',
+            opacity: 0.95,
+            ...(drag.id === selected
+              ? { backgroundColor: categoryColorByIndex(names.indexOf(drag.id)), color: '#fff', fontWeight: 500 }
+              : { border: '1px solid var(--color-line)', color: 'var(--color-muted)', backgroundColor: 'var(--color-surface)' }),
+          }}
+          className="flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm"
+          data-drag-ghost
+        >
+          {drag.id !== selected && (
+            <span
+              className="h-2 w-2 shrink-0 rounded-full"
+              style={{ backgroundColor: categoryColorByIndex(names.indexOf(drag.id)) }}
+            />
+          )}
+          {drag.id}
+        </button>
+      )}
     </div>
   )
 }

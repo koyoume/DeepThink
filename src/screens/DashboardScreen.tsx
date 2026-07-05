@@ -33,10 +33,15 @@ export function DashboardScreen({ onOpenTopic, onOpenSettings }: Props) {
   const cardRefs = useRef(new Map<string, HTMLElement>())
   interface CardDragState {
     id: string
+    originLeft: number
+    originTop: number
+    originWidth: number
+    originHeight: number
+    startClientX: number
+    startClientY: number
     dx: number
     dy: number
-    overIndex: number
-    centers: { id: string; cx: number; cy: number }[]
+    order: string[]
   }
   const [cardDrag, setCardDrag] = useState<CardDragState | null>(null)
   const cardSuppressClick = useRef<Set<string>>(new Set())
@@ -44,6 +49,7 @@ export function DashboardScreen({ onOpenTopic, onOpenSettings }: Props) {
   function handleCardPointerDown(id: string, e: React.PointerEvent) {
     const startX = e.clientX
     const startY = e.clientY
+    let lastX = e.clientX
     let lastY = e.clientY
     let timerFired = false
     let movedPastThreshold = false
@@ -52,6 +58,7 @@ export function DashboardScreen({ onOpenTopic, onOpenSettings }: Props) {
       if (timerFired) return
       // touch-action:none이라 브라우저가 이 터치로 스크롤을 안 해주므로, 롱프레스 확정 전까지는 직접 스크롤을 대신 넘겨준다.
       const dy = ev.clientY - lastY
+      lastX = ev.clientX
       lastY = ev.clientY
       window.scrollBy(0, -dy)
       if (!movedPastThreshold && (Math.abs(ev.clientX - startX) > MOVE_CANCEL_PX || Math.abs(ev.clientY - startY) > MOVE_CANCEL_PX)) {
@@ -71,66 +78,68 @@ export function DashboardScreen({ onOpenTopic, onOpenSettings }: Props) {
     const timer = window.setTimeout(() => {
       timerFired = true
       cleanup()
-      const centers = shown.map((t) => {
-        const el = cardRefs.current.get(t.id)
-        const r = el?.getBoundingClientRect()
-        return { id: t.id, cx: r ? r.left + r.width / 2 : 0, cy: r ? r.top + r.height / 2 : 0 }
-      })
-      const overIndex = shown.findIndex((t) => t.id === id)
+      const el = cardRefs.current.get(id)
+      const r = el?.getBoundingClientRect()
+      if (!r) return
       cardSuppressClick.current.add(id)
-      setCardDrag({ id, dx: 0, dy: 0, overIndex, centers })
+      setCardDrag({
+        id,
+        originLeft: r.left,
+        originTop: r.top,
+        originWidth: r.width,
+        originHeight: r.height,
+        startClientX: lastX,
+        startClientY: lastY,
+        dx: 0,
+        dy: 0,
+        order: shown.map((t) => t.id),
+      })
     }, LONG_PRESS_MS)
   }
 
+  // 드래그 중: 포인터 위치로 실시간 삽입 지점을 다시 측정해 다른 카드가 실제로 자리를 비켜주게 한다(겹침 방지).
   useEffect(() => {
     if (!cardDrag) return
-    function nearestIndex(x: number, y: number, centers: CardDragState['centers']): number {
-      let best = 0
-      let bestDist = Infinity
-      centers.forEach((c, i) => {
-        const d = (c.cx - x) ** 2 + (c.cy - y) ** 2
-        if (d < bestDist) {
-          bestDist = d
-          best = i
-        }
-      })
-      return best
-    }
-    let startX = 0
-    let startY = 0
-    const origin = cardDrag.centers.find((c) => c.id === cardDrag.id)
-    if (origin) {
-      startX = origin.cx
-      startY = origin.cy
-    }
-    function onMoveSimple(e: PointerEvent) {
+    function onMove(e: PointerEvent) {
       setCardDrag((d) => {
         if (!d) return d
-        const dx = e.clientX - startX
-        const dy = e.clientY - startY
-        const overIndex = nearestIndex(e.clientX, e.clientY, d.centers)
-        return { ...d, dx, dy, overIndex }
+        const dx = e.clientX - d.startClientX
+        const dy = e.clientY - d.startClientY
+        const restIds = d.order.filter((cid) => cid !== d.id)
+        let bestIdx = restIds.length
+        let bestDist = Infinity
+        restIds.forEach((cid, i) => {
+          const el = cardRefs.current.get(cid)
+          const r = el?.getBoundingClientRect()
+          if (!r) return
+          const cx = r.left + r.width / 2
+          const cy = r.top + r.height / 2
+          const dist = (cx - e.clientX) ** 2 + (cy - e.clientY) ** 2
+          if (dist < bestDist) {
+            bestDist = dist
+            bestIdx = i
+          }
+        })
+        const newOrder = [...restIds.slice(0, bestIdx), d.id, ...restIds.slice(bestIdx)]
+        const changed = newOrder.some((cid, i) => cid !== d.order[i])
+        return { ...d, dx, dy, order: changed ? newOrder : d.order }
       })
     }
     function onUp() {
       setCardDrag((d) => {
         if (d) {
-          const originalIndex = d.centers.findIndex((c) => c.id === d.id)
-          if (d.overIndex !== originalIndex) {
-            const ids = d.centers.map((c) => c.id)
-            const [moved] = ids.splice(originalIndex, 1)
-            ids.splice(d.overIndex, 0, moved)
-            if (current) void reorderTopicsInCategory(current, ids)
-          }
+          const original = shown.map((t) => t.id)
+          const changed = d.order.some((cid, i) => cid !== original[i])
+          if (changed && current) void reorderTopicsInCategory(current, d.order)
+          window.setTimeout(() => cardSuppressClick.current.delete(d.id), 50)
         }
-        window.setTimeout(() => cardSuppressClick.current.delete(d?.id ?? ''), 50)
         return null
       })
     }
-    window.addEventListener('pointermove', onMoveSimple)
+    window.addEventListener('pointermove', onMove)
     window.addEventListener('pointerup', onUp, { once: true })
     return () => {
-      window.removeEventListener('pointermove', onMoveSimple)
+      window.removeEventListener('pointermove', onMove)
       window.removeEventListener('pointerup', onUp)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -187,43 +196,61 @@ export function DashboardScreen({ onOpenTopic, onOpenSettings }: Props) {
         />
       ) : (
         <div className="grid flex-1 grid-cols-2 content-start items-start gap-3.5 px-4 pb-28">
-          {shown.map((topic) => {
-            const isDragging = cardDrag?.id === topic.id
-            const isDropTarget = !isDragging && cardDrag != null && shown[cardDrag.overIndex]?.id === topic.id
-            return (
-              <div
-                key={topic.id}
-                ref={(el) => {
-                  if (el) cardRefs.current.set(topic.id, el)
-                  else cardRefs.current.delete(topic.id)
-                }}
-                onPointerDown={(e) => handleCardPointerDown(topic.id, e)}
-                style={{
-                  touchAction: 'none',
-                  transform: isDragging ? `translate(${cardDrag!.dx}px, ${cardDrag!.dy}px) scale(1.04)` : undefined,
-                  position: isDragging ? 'relative' : undefined,
-                  zIndex: isDragging ? 10 : undefined,
-                  boxShadow: isDragging ? '0 12px 28px rgba(33,27,51,0.18)' : undefined,
-                  borderRadius: 16,
-                  outline: isDropTarget ? '2px solid var(--color-brand)' : undefined,
-                  outlineOffset: isDropTarget ? -2 : undefined,
-                  opacity: isDragging ? 0.92 : undefined,
-                  transition: isDragging ? undefined : 'outline-color 120ms',
-                }}
-              >
-                <TopicCard
-                  topic={topic}
-                  previewLines={previewLines}
-                  onOpen={() => {
-                    if (cardSuppressClick.current.has(topic.id)) return
-                    onOpenTopic(topic.id)
+          {(() => {
+            const byId = new Map(shown.map((t) => [t.id, t]))
+            const gridIds = cardDrag ? cardDrag.order.filter((cid) => cid !== cardDrag.id) : shown.map((t) => t.id)
+            return gridIds.map((id) => {
+              const topic = byId.get(id)
+              if (!topic) return null
+              return (
+                <div
+                  key={id}
+                  ref={(el) => {
+                    if (el) cardRefs.current.set(id, el)
+                    else cardRefs.current.delete(id)
                   }}
-                />
-              </div>
-            )
-          })}
+                  onPointerDown={(e) => handleCardPointerDown(id, e)}
+                  style={{ touchAction: 'none', borderRadius: 16, WebkitTouchCallout: 'none', WebkitUserSelect: 'none' }}
+                >
+                  <TopicCard
+                    topic={topic}
+                    previewLines={previewLines}
+                    onOpen={() => {
+                      if (cardSuppressClick.current.has(id)) return
+                      onOpenTopic(id)
+                    }}
+                  />
+                </div>
+              )
+            })
+          })()}
         </div>
       )}
+
+      {cardDrag &&
+        (() => {
+          const draggedTopic = shown.find((t) => t.id === cardDrag.id)
+          if (!draggedTopic) return null
+          return (
+            <div
+              style={{
+                position: 'fixed',
+                left: cardDrag.originLeft + cardDrag.dx,
+                top: cardDrag.originTop + cardDrag.dy,
+                width: cardDrag.originWidth,
+                height: cardDrag.originHeight,
+                zIndex: 50,
+                pointerEvents: 'none',
+                transform: 'scale(1.04)',
+                boxShadow: '0 16px 32px rgba(33,27,51,0.22)',
+                borderRadius: 16,
+                opacity: 0.96,
+              }}
+            >
+              <TopicCard topic={draggedTopic} previewLines={previewLines} onOpen={() => {}} />
+            </div>
+          )
+        })()}
 
       <button
         type="button"
