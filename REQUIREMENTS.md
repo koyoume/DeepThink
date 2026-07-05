@@ -228,6 +228,12 @@ interface Category {
 - **배포 실패 후속 수정 (1차)**: 12차 수정 커밋이 실제로는 **E2E 게이트(Playwright)에서 막혀 Cloudflare Pages에 배포되지 않았음** — `e2e/dashboard-flow.spec.ts`가 옛 UI(하단 입력바, 옛 `pb-24` 클래스 셀렉터) 기준으로 작성돼 있었는데 갱신을 안 해서 실패. `ThoughtRow.tsx`의 뷰 버튼·입력창에 `data-testid="thought-view"`/`"thought-input"`을 추가해 Tailwind 클래스 변경에 흔들리지 않는 안정적인 셀렉터로 바꾸고, 테스트 시나리오도 "마지막 줄에서 Enter로 새 줄 추가"로 다시 작성. 이 환경엔 브라우저가 없어 Playwright를 직접 돌려볼 수 없으므로, GitHub Actions CI 결과로 최종 확인 필요.
 - **배포 실패 후속 수정 (2차, 진짜 원인)**: 1차 수정 이후에도 계속 실패. 원인은 셀렉터가 아니라 **시드 데이터와 테스트 기대값의 불일치** — 샘플 주제("DeepThink 온보딩 흐름")의 마지막 줄(`sample-1-3`)이 이미 level 1(들여쓰기 상태)인데, `addAfter`가 새 줄에 현재 줄의 level을 그대로 상속하도록 되어 있어(§5.5 자연스러운 흐름 설계) 새로 추가된 줄도 level 1로 생성됨. 여기서 Tab을 누르면 level 2(`marginLeft: 44px`)가 되는데, 테스트는 level 0 기준 고정값 `'22px'`을 기대하고 있어 항상 실패했음. **레벨 상속은 의도된 동작**이므로 코드는 그대로 두고, 테스트를 "들여쓰기 전/후 marginLeft 차이가 22px(한 단계)인지"로 재작성해 시드 데이터의 시작 레벨에 좌우되지 않도록 수정.
 
+## 5.6 보기 모드(blur) 줄 텍스트 잘림 수정 (2026-07-05, 13차 수정)
+글쓰기 화면에서 한 줄이 길어지면 끝에 "..."으로 잘려서 전체 내용이 안 보이던 문제. `ThoughtRow.tsx`의 보기 모드 `<button>`에 Tailwind `truncate`(nowrap + ellipsis)가 걸려 있던 게 원인.
+
+- **수정**: `truncate` 제거, `whitespace-normal break-words`로 교체 — 긴 줄은 잘리지 않고 여러 줄로 줄바꿈되어 전체 표시됨(줄 높이는 내용만큼 늘어남).
+- **범위**: 이번엔 글쓰기 화면 개별 줄(`ThoughtRow`)만 수정. 대시보드의 주제 카드 미리보기(`TopicCard.tsx`)와 주제 제목(`DashboardScreen.tsx`), 관련자료 칩 제목(`TopicDetailScreen.tsx`)은 카드/리스트 공간이 제한적이라 여전히 `truncate` 유지 — 필요하면 별도로 논의.
+
 ## 6. 비기능 요구
 - 반응형: 데스크톱/모바일 브라우저 모두 대응(원본은 모바일 전용이었으나 웹은 양쪽 지원).
 - 편집 후 400ms debounce 저장 (원본 `TopicDetailViewModel.scheduleSave` 동일 패턴).

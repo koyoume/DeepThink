@@ -85,7 +85,7 @@ export function ThoughtRow(props: Props) {
           type="button"
           data-testid="thought-view"
           onClick={() => setFocused(true)}
-          className={`min-w-0 flex-1 truncate bg-transparent text-left text-sm outline-none ${
+          className={`min-w-0 flex-1 whitespace-normal break-words bg-transparent text-left text-sm outline-none ${
             thought.type === 'check' && thought.done ? 'text-faint line-through' : 'text-ink'
           }`}
         >
