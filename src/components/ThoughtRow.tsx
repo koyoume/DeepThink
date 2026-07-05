@@ -92,7 +92,7 @@ export function ThoughtRow(props: Props) {
       onPointerUp={handlePointerUp}
     >
       <ThoughtGlyph type={thought.type} done={thought.done} onToggle={props.onToggleDone} />
-      {!focused && thought.text.trim() !== '' ? (
+      {!focused && !props.focusRequested && thought.text.trim() !== '' ? (
         <button
           type="button"
           onClick={() => setFocused(true)}
