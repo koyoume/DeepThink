@@ -133,6 +133,17 @@ interface Category {
 - **범위 밖**: 밑줄, 글자색(프리셋), 서식 적용 툴바/키보드 단축키(Cmd/Ctrl+B 등). 필요 시 별도 결정 후 추가.
 - **실버그(배포 직후 발견·수정)**: 렌더 모드 조건이 `!focused && text!=''`만 보고 있어, 하단 입력바로 새 줄을 추가할 때(`addAtEnd` — 텍스트가 이미 채워진 채 `focusRequest`도 함께 생성됨) 그 줄이 마운트 시점부터 렌더링 버튼으로 그려져 실제 `<input>`이 DOM에 없었음 → 자동 포커스 효과가 `inputRef.current`를 못 찾아 조용히 실패, 새 줄이 편집 상태로 안 들어감. 이 버그가 CI E2E 게이트를 실패시켜 **직전 배포(인라인 서식 커밋) 자체가 라이브에 반영되지 못함**. 조건에 `!props.focusRequested`를 추가해 수정(포커스 요청이 걸린 줄은 텍스트 유무와 무관하게 항상 input 마운트). 수정 후 E2E 게이트·배포 모두 성공 확인.
 
+## 5.2 최근 카테고리 기억 + 3종 드래그 재정렬 (2026-07-05 구현)
+**결정 배경**: 카테고리 선택이 새로고침 시 초기화됨(메모리 상태만 있고 영속화 안 됨), 카테고리/주제/생각줄 순서를 바꿀 방법이 없었음. 아래 4가지를 한 세션에서 함께 구현.
+
+- **최근 카테고리 기억**: `selectedCategory`를 `localStorage`(`deepthink:selectedCategory`)에 저장. 앱 재시작·새로고침 시 저장된 이름이 현재 카테고리 목록에 남아 있으면 그 카테고리로 복원, 없으면 기존처럼 첫 카테고리로 폴백(`effectiveSelectedCategory` 로직 그대로 재사용).
+- **카테고리 순서 변경**: 홈 화면 카테고리 칩을 **길게 누르면(320ms)** 드래그 모드 진입 → 좌우로 끌어 순서 변경 → 손을 떼면 확정. 순서는 이미 존재하던 `.deepthink/categories.json`(`vaultFileStore.writeOrder`)에 저장되므로 git sync에도 반영됨. 짧게 누르면 기존처럼 카테고리 선택(길게 눌러 드래그가 활성화된 경우에만 그 탭의 `onClick` 억제).
+- **홈 화면 주제 카드 순서**: 카드도 **길게 눌러 드래그**로 2열 그리드 안에서 재정렬. **카테고리별로 별도 순서 저장**(해당 카테고리 `.md` 파일 내 주제 배열 순서 = 카드 노출 순서). `reorderTopicsInCategory` 스토어 액션 신설.
+- **글 작성 들여쓰기·순서 drag**: 각 생각 줄 왼쪽에 드래그 핸들(`⠿`) 추가. **핸들을 좌우로 끌면 들여쓰기 레벨 변경**(22px당 1레벨, 기존 `shiftLevel` 로직 재사용 — 하위 중첩 블록 전체가 함께 이동), **위아래로 끌면 줄 순서 변경**(중첩 자식이 있으면 블록 전체가 함께 이동). 기존에 있던 "줄 전체를 좌우로 스와이프하면 들여쓰기" 제스처는 핸들 방식으로 대체(스크롤과의 오탐 방지 목적도 있음). 드래그 중엔 대상 줄이 포인터를 따라 살짝 들리고, 삽입 위치에 얇은 보라 선(인디케이터)이 표시됨.
+- **공통 인터랙션 언어**: 카테고리 칩·주제 카드는 "길게 눌러 드래그", 생각 줄은 "전용 핸들 드래그"로 통일. 별도 라이브러리 추가 없이(dnd-kit 등 미도입) `pointerdown/move/up` 기반으로 직접 구현 — 기존 코드베이스가 이미 같은 방식(예전 `ThoughtRow`의 스와이프 제스처)을 쓰고 있어 패턴을 유지.
+- **구현 위치**: `store/vaultStore.ts`(`reorderCategories`/`reorderTopicsInCategory`/localStorage), `screens/useTopicDetailState.ts`(`reorderThought`/`shiftLevelBy`), `components/CategoryChips.tsx`·`screens/DashboardScreen.tsx`(칩·카드 드래그), `components/ThoughtRow.tsx`·`screens/TopicDetailScreen.tsx`(핸들 드래그).
+- **불변**: 마크다운 저장 포맷·git sync 대상 파일 구조 변경 없음(카테고리 순서는 기존 `categories.json` 재사용, 주제 순서는 기존 카테고리 `.md` 파일 내 배열 순서 재사용).
+
 ## 6. 비기능 요구
 - 반응형: 데스크톱/모바일 브라우저 모두 대응(원본은 모바일 전용이었으나 웹은 양쪽 지원).
 - 편집 후 400ms debounce 저장 (원본 `TopicDetailViewModel.scheduleSave` 동일 패턴).

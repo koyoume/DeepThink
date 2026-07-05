@@ -167,6 +167,32 @@ export function useTopicDetailState(topicId: string) {
     shiftLevel(id, -1)
   }
 
+  /** 들여쓰기 핸들 드래그: 임의 크기의 레벨 변화를 한 번에 적용 (기존 shiftLevel 재사용) */
+  function shiftLevelBy(id: string, delta: number) {
+    if (delta === 0) return
+    shiftLevel(id, delta)
+  }
+
+  /**
+   * 들여쓰기 핸들 드래그(세로): id 줄(과 그 하위 중첩 블록 전체)을 targetIndex 위치로 이동.
+   * targetIndex는 "이동 전" thoughts 배열 기준 삽입 지점(그 인덱스의 줄 앞에 삽입).
+   */
+  function reorderThought(id: string, targetIndex: number) {
+    update((s) => {
+      const idx = s.thoughts.findIndex((t) => t.id === id)
+      if (idx < 0) return s
+      const level = s.thoughts[idx].level
+      let end = idx + 1
+      while (end < s.thoughts.length && s.thoughts[end].level > level) end++
+      const block = s.thoughts.slice(idx, end)
+      const rest = [...s.thoughts.slice(0, idx), ...s.thoughts.slice(end)]
+      let insertAt = targetIndex > idx ? targetIndex - block.length : targetIndex
+      insertAt = Math.max(0, Math.min(insertAt, rest.length))
+      const list = [...rest.slice(0, insertAt), ...block, ...rest.slice(insertAt)]
+      return { ...s, thoughts: list }
+    })
+  }
+
   function changeCategory(newCategory: string) {
     update((s) => ({ ...s, category: newCategory }))
     void moveTopicInStore(topicId, newCategory)
@@ -209,6 +235,8 @@ export function useTopicDetailState(topicId: string) {
     deleteThought,
     indent,
     outdent,
+    shiftLevelBy,
+    reorderThought,
     changeCategory,
     deleteTopic,
     addMaterial,

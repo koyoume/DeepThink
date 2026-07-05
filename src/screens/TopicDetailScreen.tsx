@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { ThoughtRow } from '../components/ThoughtRow.tsx'
 import { EmptyState } from '../components/EmptyState.tsx'
 import { Loading } from '../components/Loading.tsx'
@@ -18,6 +18,74 @@ export function TopicDetailScreen({ topicId, onBack }: Props) {
   const detail = useTopicDetailState(topicId)
   const [menuOpen, setMenuOpen] = useState(false)
   const [draft, setDraft] = useState('')
+
+  const rowRefs = useRef(new Map<string, HTMLDivElement>())
+  interface DragState {
+    id: string
+    startX: number
+    startY: number
+    dx: number
+    dy: number
+    overIndex: number
+    metrics: { id: string; top: number; height: number }[]
+  }
+  const [drag, setDrag] = useState<DragState | null>(null)
+
+  function startHandleDrag(id: string, e: React.PointerEvent) {
+    e.preventDefault()
+    const metrics = detail.state.thoughts.map((t) => {
+      const el = rowRefs.current.get(t.id)
+      const rect = el?.getBoundingClientRect()
+      return { id: t.id, top: rect?.top ?? 0, height: rect?.height ?? 32 }
+    })
+    const overIndex = detail.state.thoughts.findIndex((t) => t.id === id)
+    setDrag({ id, startX: e.clientX, startY: e.clientY, dx: 0, dy: 0, overIndex, metrics })
+  }
+
+  // 활성 드래그 동안 window 레벨에서 pointermove/pointerup 추적 (핸들 밖으로 나가도 계속 동작)
+  useEffect(() => {
+    if (!drag) return
+    function onMove(e: PointerEvent) {
+      setDrag((d) => {
+        if (!d) return d
+        const dx = e.clientX - d.startX
+        const dy = e.clientY - d.startY
+        let overIndex = d.metrics.length
+        for (let i = 0; i < d.metrics.length; i++) {
+          const m = d.metrics[i]
+          if (e.clientY < m.top + m.height / 2) {
+            overIndex = i
+            break
+          }
+        }
+        return { ...d, dx, dy, overIndex }
+      })
+    }
+    function onUp() {
+      setDrag((d) => {
+        if (d) {
+          const originalIndex = d.metrics.findIndex((m) => m.id === d.id)
+          if (d.overIndex !== originalIndex) {
+            detail.reorderThought(d.id, d.overIndex)
+          }
+          const levelDelta = Math.round(d.dx / 22)
+          if (levelDelta !== 0) {
+            detail.shiftLevelBy(d.id, levelDelta)
+          }
+        }
+        return null
+      })
+    }
+    window.addEventListener('pointermove', onMove)
+    window.addEventListener('pointerup', onUp, { once: true })
+    return () => {
+      window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('pointerup', onUp)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [drag?.id])
+
+  const overThoughtId = drag ? (detail.state.thoughts[drag.overIndex]?.id ?? '__end__') : null
 
   const titleRef = useAutoFitFontSize<HTMLTextAreaElement>(detail.state.title || '(제목 없음)', {
     max: 27,
@@ -126,26 +194,47 @@ export function TopicDetailScreen({ topicId, onBack }: Props) {
             glyph="●"
           />
         )}
-        {detail.state.thoughts.map((t) => (
-          <ThoughtRow
-            key={t.id}
-            thought={t}
-            focusRequested={detail.focusRequest === t.id}
-            onFocusHandled={detail.clearFocusRequest}
-            onFocus={() => detail.setFocused(t.id)}
-            onBlur={() => detail.clearFocused(t.id)}
-            onTextChange={(text) => detail.setText(t.id, text)}
-            onToggleDone={() => detail.toggleDone(t.id)}
-            onToggleType={() => detail.setType(t.id, t.type === 'check' ? 'comment' : 'check')}
-            onEnter={() => detail.addAfter(t.id)}
-            onBackspaceAtStart={() => {
-              if (t.text === '') detail.deleteThought(t.id)
-            }}
-            onIndent={() => detail.indent(t.id)}
-            onOutdent={() => detail.outdent(t.id)}
-            onDelete={() => detail.deleteThought(t.id)}
-          />
-        ))}
+        {detail.state.thoughts.map((t) => {
+          const isDragging = drag?.id === t.id
+          return (
+            <div
+              key={t.id}
+              ref={(el) => {
+                if (el) rowRefs.current.set(t.id, el)
+                else rowRefs.current.delete(t.id)
+              }}
+              style={{
+                borderTop: overThoughtId === t.id ? '2px solid var(--color-brand)' : undefined,
+                transform: isDragging ? `translate(${drag!.dx}px, ${drag!.dy}px)` : undefined,
+                position: isDragging ? 'relative' : undefined,
+                zIndex: isDragging ? 10 : undefined,
+              }}
+            >
+              <ThoughtRow
+                thought={t}
+                dragging={isDragging}
+                focusRequested={detail.focusRequest === t.id}
+                onFocusHandled={detail.clearFocusRequest}
+                onFocus={() => detail.setFocused(t.id)}
+                onBlur={() => detail.clearFocused(t.id)}
+                onTextChange={(text) => detail.setText(t.id, text)}
+                onToggleDone={() => detail.toggleDone(t.id)}
+                onToggleType={() => detail.setType(t.id, t.type === 'check' ? 'comment' : 'check')}
+                onEnter={() => detail.addAfter(t.id)}
+                onBackspaceAtStart={() => {
+                  if (t.text === '') detail.deleteThought(t.id)
+                }}
+                onIndent={() => detail.indent(t.id)}
+                onOutdent={() => detail.outdent(t.id)}
+                onDelete={() => detail.deleteThought(t.id)}
+                onHandlePointerDown={(e) => startHandleDrag(t.id, e)}
+              />
+            </div>
+          )
+        })}
+        {drag && overThoughtId === '__end__' && (
+          <div style={{ borderTop: '2px solid var(--color-brand)', height: 0 }} />
+        )}
       </div>
 
       <footer className="fixed bottom-0 left-1/2 flex w-full max-w-2xl -translate-x-1/2 items-center gap-2 border-t border-line bg-surface p-3">

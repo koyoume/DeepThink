@@ -1,9 +1,12 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { CategoryChips } from '../components/CategoryChips.tsx'
 import { TopicCard } from '../components/TopicCard.tsx'
 import { EmptyState } from '../components/EmptyState.tsx'
 import { effectiveSelectedCategory, topicsInCategory, useVaultStore } from '../store/vaultStore.ts'
 import { useGitStore } from '../store/gitStore.ts'
+
+const LONG_PRESS_MS = 320
+const MOVE_CANCEL_PX = 8
 
 interface Props {
   onOpenTopic: (id: string) => void
@@ -17,12 +20,114 @@ export function DashboardScreen({ onOpenTopic, onOpenSettings }: Props) {
   const selectedCategory = useVaultStore((s) => s.selectedCategory)
   const selectCategory = useVaultStore((s) => s.selectCategory)
   const createTopic = useVaultStore((s) => s.createTopic)
+  const reorderCategories = useVaultStore((s) => s.reorderCategories)
+  const reorderTopicsInCategory = useVaultStore((s) => s.reorderTopicsInCategory)
   const settingPreviewLines = useGitStore((s) => s.previewLines)
 
   const [previewOverride, setPreviewOverride] = useState<number | null>(null)
   const previewLines = previewOverride ?? settingPreviewLines
   const current = effectiveSelectedCategory({ categories, selectedCategory })
   const shown = topicsInCategory(topics, current)
+
+  // 홈 화면 주제 카드 길게 눌러 드래그 재정렬 (카테고리별 순서)
+  const cardRefs = useRef(new Map<string, HTMLElement>())
+  interface CardDragState {
+    id: string
+    dx: number
+    dy: number
+    overIndex: number
+    centers: { id: string; cx: number; cy: number }[]
+  }
+  const [cardDrag, setCardDrag] = useState<CardDragState | null>(null)
+  const cardSuppressClick = useRef<Set<string>>(new Set())
+
+  function handleCardPointerDown(id: string, e: React.PointerEvent) {
+    const startX = e.clientX
+    const startY = e.clientY
+    let cancelled = false
+    function onEarlyMove(ev: PointerEvent) {
+      if (Math.abs(ev.clientX - startX) > MOVE_CANCEL_PX || Math.abs(ev.clientY - startY) > MOVE_CANCEL_PX) {
+        cancelled = true
+        window.clearTimeout(timer)
+        window.removeEventListener('pointermove', onEarlyMove)
+        window.removeEventListener('pointerup', onEarlyUp)
+      }
+    }
+    function onEarlyUp() {
+      window.clearTimeout(timer)
+      window.removeEventListener('pointermove', onEarlyMove)
+      window.removeEventListener('pointerup', onEarlyUp)
+    }
+    window.addEventListener('pointermove', onEarlyMove)
+    window.addEventListener('pointerup', onEarlyUp)
+    const timer = window.setTimeout(() => {
+      window.removeEventListener('pointermove', onEarlyMove)
+      window.removeEventListener('pointerup', onEarlyUp)
+      if (cancelled) return
+      const centers = shown.map((t) => {
+        const el = cardRefs.current.get(t.id)
+        const r = el?.getBoundingClientRect()
+        return { id: t.id, cx: r ? r.left + r.width / 2 : 0, cy: r ? r.top + r.height / 2 : 0 }
+      })
+      const overIndex = shown.findIndex((t) => t.id === id)
+      cardSuppressClick.current.add(id)
+      setCardDrag({ id, dx: 0, dy: 0, overIndex, centers })
+    }, LONG_PRESS_MS)
+  }
+
+  useEffect(() => {
+    if (!cardDrag) return
+    function nearestIndex(x: number, y: number, centers: CardDragState['centers']): number {
+      let best = 0
+      let bestDist = Infinity
+      centers.forEach((c, i) => {
+        const d = (c.cx - x) ** 2 + (c.cy - y) ** 2
+        if (d < bestDist) {
+          bestDist = d
+          best = i
+        }
+      })
+      return best
+    }
+    let startX = 0
+    let startY = 0
+    const origin = cardDrag.centers.find((c) => c.id === cardDrag.id)
+    if (origin) {
+      startX = origin.cx
+      startY = origin.cy
+    }
+    function onMoveSimple(e: PointerEvent) {
+      setCardDrag((d) => {
+        if (!d) return d
+        const dx = e.clientX - startX
+        const dy = e.clientY - startY
+        const overIndex = nearestIndex(e.clientX, e.clientY, d.centers)
+        return { ...d, dx, dy, overIndex }
+      })
+    }
+    function onUp() {
+      setCardDrag((d) => {
+        if (d) {
+          const originalIndex = d.centers.findIndex((c) => c.id === d.id)
+          if (d.overIndex !== originalIndex) {
+            const ids = d.centers.map((c) => c.id)
+            const [moved] = ids.splice(originalIndex, 1)
+            ids.splice(d.overIndex, 0, moved)
+            if (current) void reorderTopicsInCategory(current, ids)
+          }
+        }
+        window.setTimeout(() => cardSuppressClick.current.delete(d?.id ?? ''), 50)
+        return null
+      })
+    }
+    window.addEventListener('pointermove', onMoveSimple)
+    window.addEventListener('pointerup', onUp, { once: true })
+    return () => {
+      window.removeEventListener('pointermove', onMoveSimple)
+      window.removeEventListener('pointerup', onUp)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cardDrag?.id])
 
   function cyclePreviewLines() {
     setPreviewOverride(previewLines <= 0 ? 3 : previewLines - 1)
@@ -56,7 +161,12 @@ export function DashboardScreen({ onOpenTopic, onOpenSettings }: Props) {
         </div>
       </header>
 
-      <CategoryChips names={categories.map((c) => c.name)} selected={current} onSelect={selectCategory} />
+      <CategoryChips
+        names={categories.map((c) => c.name)}
+        selected={current}
+        onSelect={selectCategory}
+        onReorder={(names) => void reorderCategories(names)}
+      />
 
       <p className="px-4 pb-2 pt-1 text-xs text-muted">
         주제 {shown.length}개 · 미리보기 {previewLines > 0 ? `최대 ${previewLines}줄` : '끔'}
@@ -70,9 +180,36 @@ export function DashboardScreen({ onOpenTopic, onOpenSettings }: Props) {
         />
       ) : (
         <div className="grid flex-1 grid-cols-2 content-start items-start gap-3.5 px-4 pb-28">
-          {shown.map((topic) => (
-            <TopicCard key={topic.id} topic={topic} previewLines={previewLines} onOpen={() => onOpenTopic(topic.id)} />
-          ))}
+          {shown.map((topic) => {
+            const isDragging = cardDrag?.id === topic.id
+            return (
+              <div
+                key={topic.id}
+                ref={(el) => {
+                  if (el) cardRefs.current.set(topic.id, el)
+                  else cardRefs.current.delete(topic.id)
+                }}
+                onPointerDown={(e) => handleCardPointerDown(topic.id, e)}
+                style={{
+                  touchAction: 'manipulation',
+                  transform: isDragging ? `translate(${cardDrag!.dx}px, ${cardDrag!.dy}px) scale(1.03)` : undefined,
+                  position: isDragging ? 'relative' : undefined,
+                  zIndex: isDragging ? 10 : undefined,
+                  boxShadow: isDragging ? '0 12px 28px rgba(33,27,51,0.18)' : undefined,
+                  borderRadius: isDragging ? 16 : undefined,
+                }}
+              >
+                <TopicCard
+                  topic={topic}
+                  previewLines={previewLines}
+                  onOpen={() => {
+                    if (cardSuppressClick.current.has(topic.id)) return
+                    onOpenTopic(topic.id)
+                  }}
+                />
+              </div>
+            )
+          })}
         </div>
       )}
 

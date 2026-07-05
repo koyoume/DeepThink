@@ -49,6 +49,24 @@ function newId(): string {
   return crypto.randomUUID()
 }
 
+const SELECTED_CATEGORY_KEY = 'deepthink:selectedCategory'
+
+function loadStoredSelectedCategory(): string | null {
+  try {
+    return localStorage.getItem(SELECTED_CATEGORY_KEY)
+  } catch {
+    return null
+  }
+}
+
+function storeSelectedCategory(name: string): void {
+  try {
+    localStorage.setItem(SELECTED_CATEGORY_KEY, name)
+  } catch {
+    // localStorage 접근 불가(프라이빗 모드 등) — 메모리 상태로만 동작
+  }
+}
+
 interface VaultState {
   loaded: boolean
   categories: Category[]
@@ -67,6 +85,8 @@ interface VaultState {
   addCategory: (name: string) => Promise<void>
   renameCategory: (oldName: string, newName: string) => Promise<void>
   deleteCategory: (name: string) => Promise<void>
+  reorderCategories: (names: string[]) => Promise<void>
+  reorderTopicsInCategory: (category: string, orderedIds: string[]) => Promise<void>
 }
 
 const withMutex = createMutex()
@@ -93,7 +113,9 @@ async function load(seedIfEmpty: boolean, set: (partial: Partial<VaultState>) =>
   const parsed = await vaultFileStore.readAll()
   const categories = parsed.map((c, i) => ({ name: c.name, order: i }))
   const topics = parsed.flatMap((c) => c.topics)
-  set({ categories, topics, loaded: true })
+  const stored = loadStoredSelectedCategory()
+  const selectedCategory = stored && categories.some((c) => c.name === stored) ? stored : null
+  set({ categories, topics, loaded: true, selectedCategory })
 
   const order = await vaultFileStore.readOrder()
   if (order.length === 0 && categories.length > 0) {
@@ -109,7 +131,10 @@ export const useVaultStore = create<VaultState>((set, get) => ({
 
   init: () => withMutex(() => load(true, set)),
   reload: () => withMutex(() => load(false, set)),
-  selectCategory: (name) => set({ selectedCategory: name }),
+  selectCategory: (name) => {
+    storeSelectedCategory(name)
+    set({ selectedCategory: name })
+  },
 
   createTopic: (category, title = '') =>
     withMutex(async () => {
@@ -170,6 +195,28 @@ export const useVaultStore = create<VaultState>((set, get) => ({
       set({ categories, topics })
       await vaultFileStore.deleteCategoryFile(name)
       await vaultFileStore.writeOrder(categories.map((c) => c.name))
+    }),
+
+  /** 홈 화면 카테고리 칩 길게 눌러 드래그 재정렬 — 순서를 .deepthink/categories.json에 영속화 */
+  reorderCategories: (names) =>
+    withMutex(async () => {
+      const byName = new Map(get().categories.map((c) => [c.name, c]))
+      const categories = names.filter((n) => byName.has(n)).map((n, i) => ({ ...byName.get(n)!, order: i }))
+      if (categories.length !== get().categories.length) return // 이름 불일치 시 안전하게 무시
+      set({ categories })
+      await vaultFileStore.writeOrder(names)
+    }),
+
+  /** 홈 화면 주제 카드 길게 눌러 드래그 재정렬 — 카테고리별로 별도 순서 저장(해당 카테고리 .md 파일 순서) */
+  reorderTopicsInCategory: (category, orderedIds) =>
+    withMutex(async () => {
+      const inCat = get().topics.filter((t) => t.category === category)
+      const byId = new Map(inCat.map((t) => [t.id, t]))
+      const reordered = orderedIds.filter((id) => byId.has(id)).map((id) => byId.get(id)!)
+      if (reordered.length !== inCat.length) return
+      const others = get().topics.filter((t) => t.category !== category)
+      set({ topics: [...others, ...reordered] })
+      await persist(category, get().topics)
     }),
 }))
 

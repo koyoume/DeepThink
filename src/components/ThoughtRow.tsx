@@ -17,17 +17,16 @@ interface Props {
   onIndent: () => void
   onOutdent: () => void
   onDelete: () => void
+  onHandlePointerDown: (e: React.PointerEvent) => void
+  dragging?: boolean
 }
 
-const SWIPE_THRESHOLD = 40
-
-/** UI-DESIGN §6: 인라인 편집 + Enter 삽입, 좌우 스와이프 들여쓰기, 길게 누르기(⋯ 버튼) 메뉴 */
+/** UI-DESIGN §6: 인라인 편집 + Enter 삽입, 좌측 핸들(≡) 드래그로 들여쓰기·순서 변경, 길게 누르기(⋯ 버튼) 메뉴 */
 export function ThoughtRow(props: Props) {
   const { thought } = props
   const inputRef = useRef<HTMLInputElement | null>(null)
   const [menuOpen, setMenuOpen] = useState(false)
   const [focused, setFocused] = useState(false)
-  const pointer = useRef<{ x: number; y: number; active: boolean } | null>(null)
 
   const onFocusHandled = props.onFocusHandled
   useEffect(() => {
@@ -69,28 +68,20 @@ export function ThoughtRow(props: Props) {
     }
   }
 
-  function handlePointerDown(e: React.PointerEvent) {
-    pointer.current = { x: e.clientX, y: e.clientY, active: true }
-  }
-
-  function handlePointerUp(e: React.PointerEvent) {
-    if (!pointer.current?.active) return
-    const dx = e.clientX - pointer.current.x
-    const dy = e.clientY - pointer.current.y
-    pointer.current = null
-    if (Math.abs(dx) >= SWIPE_THRESHOLD && Math.abs(dx) > Math.abs(dy)) {
-      if (dx > 0) props.onIndent()
-      else props.onOutdent()
-    }
-  }
-
   return (
     <div
-      className="group relative flex items-start gap-2 py-1"
+      className={`group relative flex items-start gap-1 py-1 ${props.dragging ? 'opacity-70' : ''}`}
       style={{ marginLeft: thought.level * 22, borderLeft: thought.level > 0 ? '2px solid var(--color-guide)' : undefined, paddingLeft: thought.level > 0 ? 8 : 0 }}
-      onPointerDown={handlePointerDown}
-      onPointerUp={handlePointerUp}
     >
+      <span
+        role="button"
+        aria-label="드래그해서 들여쓰기·순서 변경"
+        onPointerDown={props.onHandlePointerDown}
+        className="mt-0.5 shrink-0 cursor-grab touch-none select-none px-0.5 text-xs leading-none text-faint opacity-0 transition-opacity group-hover:opacity-100"
+        style={{ touchAction: 'none' }}
+      >
+        ⠿
+      </span>
       <ThoughtGlyph type={thought.type} done={thought.done} onToggle={props.onToggleDone} />
       {!focused && !props.focusRequested && thought.text.trim() !== '' ? (
         <button
