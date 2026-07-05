@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import { ThoughtRow } from '../components/ThoughtRow.tsx'
 import { EmptyState } from '../components/EmptyState.tsx'
 import { Loading } from '../components/Loading.tsx'
@@ -19,7 +19,13 @@ export function TopicDetailScreen({ topicId, onBack }: Props) {
   const [menuOpen, setMenuOpen] = useState(false)
   const [draft, setDraft] = useState('')
 
+  const LONG_PRESS_MS = 320
+  const MOVE_CANCEL_PX = 8
+  const REORDER_MOVE_THRESHOLD = 6
+  const EDGE_MARGIN_PX = 96
+
   const rowRefs = useRef(new Map<string, HTMLDivElement>())
+  const rowSuppressClick = useRef<Set<string>>(new Set())
   interface DragState {
     id: string
     startX: number
@@ -31,25 +37,28 @@ export function TopicDetailScreen({ topicId, onBack }: Props) {
   }
   const [drag, setDrag] = useState<DragState | null>(null)
 
-  function startHandleDrag(id: string, e: React.PointerEvent) {
-    e.preventDefault()
+  /** 롱프레스가 확정된 그 즉시(같은 틱) 드래그용 리스너까지 동기적으로 붙인다.
+   *  별도 useEffect로 분리하면 상태 반영과 리스너 부착 사이의 틈에 pointerup이 끼어들 때
+   *  아무도 못 받아서 drag가 영원히 안 풀리는 경쟁 상태가 생길 수 있다(대시보드 카드 겹침 버그와 동일 원인). */
+  function activateRowDrag(id: string, startClientX: number, startClientY: number) {
     const metrics = detail.state.thoughts.map((t) => {
       const el = rowRefs.current.get(t.id)
       const rect = el?.getBoundingClientRect()
       return { id: t.id, top: rect?.top ?? 0, height: rect?.height ?? 32 }
     })
     const overIndex = detail.state.thoughts.findIndex((t) => t.id === id)
-    setDrag({ id, startX: e.clientX, startY: e.clientY, dx: 0, dy: 0, overIndex, metrics })
-  }
+    rowSuppressClick.current.add(id)
+    setDrag({ id, startX: startClientX, startY: startClientY, dx: 0, dy: 0, overIndex, metrics })
 
-  // 활성 드래그 동안 window 레벨에서 pointermove/pointerup 추적 (핸들 밖으로 나가도 계속 동작)
-  useEffect(() => {
-    if (!drag) return
     function onMove(e: PointerEvent) {
       setDrag((d) => {
         if (!d) return d
         const dx = e.clientX - d.startX
         const dy = e.clientY - d.startY
+        // 활성화 지점에서 실제로 어느 정도 움직이기 전까진 삽입 지점 재계산을 하지 않는다.
+        if (Math.hypot(dx, dy) < REORDER_MOVE_THRESHOLD) {
+          return { ...d, dx, dy }
+        }
         let overIndex = d.metrics.length
         for (let i = 0; i < d.metrics.length; i++) {
           const m = d.metrics[i]
@@ -62,6 +71,9 @@ export function TopicDetailScreen({ topicId, onBack }: Props) {
       })
     }
     function onUp() {
+      window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('pointerup', onUp)
+      window.removeEventListener('pointercancel', onUp)
       setDrag((d) => {
         if (d) {
           const originalIndex = d.metrics.findIndex((m) => m.id === d.id)
@@ -72,18 +84,61 @@ export function TopicDetailScreen({ topicId, onBack }: Props) {
           if (levelDelta !== 0) {
             detail.shiftLevelBy(d.id, levelDelta)
           }
+          window.setTimeout(() => rowSuppressClick.current.delete(d.id), 50)
         }
         return null
       })
     }
     window.addEventListener('pointermove', onMove)
-    window.addEventListener('pointerup', onUp, { once: true })
-    return () => {
+    window.addEventListener('pointerup', onUp)
+    window.addEventListener('pointercancel', onUp)
+  }
+
+  /** UI-DESIGN §6 / §5.2: 드래그 인지 영역은 줄 전체 — 어디를 눌러도 길게 누르면 들여쓰기·순서 변경 드래그가 시작된다.
+   *  짧게 누르면(320ms 이내 뗌) 그 아래 버튼(텍스트 편집·체크 토글·메뉴)의 원래 클릭이 정상 동작한다. */
+  function handleRowPointerDown(id: string, e: React.PointerEvent) {
+    // 화면 하단 엣지 근처(입력창 위)를 누르면 모바일 OS 제스처와 겹칠 수 있어 살짝 위로 스크롤해 여유를 만든다.
+    const distanceFromBottom = window.innerHeight - e.clientY
+    if (distanceFromBottom < EDGE_MARGIN_PX) {
+      window.scrollBy({ top: EDGE_MARGIN_PX - distanceFromBottom })
+    }
+    const startX = e.clientX
+    const startY = e.clientY
+    let lastX = e.clientX
+    let lastY = e.clientY
+    let timerFired = false
+    let movedPastThreshold = false
+
+    function onMove(ev: PointerEvent) {
+      if (timerFired) return
+      // touch-action:none이라 브라우저가 이 터치로 스크롤을 안 해주므로, 롱프레스 확정 전까지는 직접 스크롤을 대신 넘겨준다.
+      const dy = ev.clientY - lastY
+      lastX = ev.clientX
+      lastY = ev.clientY
+      window.scrollBy(0, -dy)
+      if (!movedPastThreshold && (Math.abs(ev.clientX - startX) > MOVE_CANCEL_PX || Math.abs(ev.clientY - startY) > MOVE_CANCEL_PX)) {
+        movedPastThreshold = true
+        window.clearTimeout(timer)
+      }
+    }
+    function onUp() {
+      window.clearTimeout(timer)
+      cleanup()
+    }
+    function cleanup() {
       window.removeEventListener('pointermove', onMove)
       window.removeEventListener('pointerup', onUp)
+      window.removeEventListener('pointercancel', onUp)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [drag?.id])
+    window.addEventListener('pointermove', onMove)
+    window.addEventListener('pointerup', onUp)
+    window.addEventListener('pointercancel', onUp)
+    const timer = window.setTimeout(() => {
+      timerFired = true
+      cleanup()
+      activateRowDrag(id, lastX, lastY)
+    }, LONG_PRESS_MS)
+  }
 
   const overThoughtId = drag ? (detail.state.thoughts[drag.overIndex]?.id ?? '__end__') : null
 
@@ -208,6 +263,16 @@ export function TopicDetailScreen({ topicId, onBack }: Props) {
                 transform: isDragging ? `translate(${drag!.dx}px, ${drag!.dy}px)` : undefined,
                 position: isDragging ? 'relative' : undefined,
                 zIndex: isDragging ? 10 : undefined,
+                touchAction: 'none',
+                WebkitTouchCallout: 'none',
+                WebkitUserSelect: 'none',
+              }}
+              onPointerDown={(e) => handleRowPointerDown(t.id, e)}
+              onClickCapture={(e) => {
+                if (rowSuppressClick.current.has(t.id)) {
+                  e.preventDefault()
+                  e.stopPropagation()
+                }
               }}
             >
               <ThoughtRow
@@ -227,7 +292,6 @@ export function TopicDetailScreen({ topicId, onBack }: Props) {
                 onIndent={() => detail.indent(t.id)}
                 onOutdent={() => detail.outdent(t.id)}
                 onDelete={() => detail.deleteThought(t.id)}
-                onHandlePointerDown={(e) => startHandleDrag(t.id, e)}
               />
             </div>
           )

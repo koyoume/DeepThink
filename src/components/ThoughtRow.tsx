@@ -17,11 +17,12 @@ interface Props {
   onIndent: () => void
   onOutdent: () => void
   onDelete: () => void
-  onHandlePointerDown: (e: React.PointerEvent) => void
   dragging?: boolean
 }
 
-/** UI-DESIGN §6: 인라인 편집 + Enter 삽입, 좌측 핸들(≡) 드래그로 들여쓰기·순서 변경, 길게 누르기(⋯ 버튼) 메뉴 */
+/** UI-DESIGN §6: 인라인 편집 + Enter 삽입. 드래그 인지 영역은 줄 전체(길게 누르면 들여쓰기·순서 변경 시작,
+ *  좌우=들여쓰기/우측=순서, TopicDetailScreen에서 처리) — ⠿는 그 자리에 있다는 시각적 표시일 뿐 별도 히트영역 아님.
+ *  길게 누르기(⋯ 버튼) 메뉴. */
 export function ThoughtRow(props: Props) {
   const { thought } = props
   const inputRef = useRef<HTMLInputElement | null>(null)
@@ -74,11 +75,8 @@ export function ThoughtRow(props: Props) {
       style={{ marginLeft: thought.level * 22, borderLeft: thought.level > 0 ? '2px solid var(--color-guide)' : undefined, paddingLeft: thought.level > 0 ? 8 : 0 }}
     >
       <span
-        role="button"
-        aria-label="드래그해서 들여쓰기·순서 변경"
-        onPointerDown={props.onHandlePointerDown}
-        className="mt-0.5 shrink-0 cursor-grab touch-none select-none px-0.5 text-xs leading-none text-faint opacity-0 transition-opacity group-hover:opacity-100"
-        style={{ touchAction: 'none' }}
+        aria-hidden="true"
+        className="mt-0.5 shrink-0 select-none px-0.5 text-xs leading-none text-faint opacity-0 transition-opacity group-hover:opacity-100"
       >
         ⠿
       </span>
