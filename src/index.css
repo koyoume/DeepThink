@@ -4,7 +4,7 @@
    동작/레이아웃(레거시 UI-DESIGN §4~6)은 고정, 시각 토큰만 새로. */
 @theme {
   /* 색 */
-  --color-paper: #FBFAF7;        /* 앱 배경(따뜻한 종이색) */
+  --color-paper: #F1ECE2;        /* 앱 배경(살짝 진한 종이색 — 흰 카드 대비↑) */
   --color-surface: #FFFFFF;      /* 카드/표면 */
   --color-ink: #211B33;          /* 본문(보라 기미 딥) */
   --color-muted: #78748A;        /* 보조 텍스트 */

@@ -1,5 +1,5 @@
 # DeepThink 웹 이식 — 계획·진행 현황
-> 상태: P0~P6 완료·배포 라이브. P7 시각 디자인 "Outliner Ink"는 브랜치 `design/outliner-ink`에서 작업 완료(빌드 통과), 실기기 확인 후 main 병합 대기(§6 세션5) · 최종 갱신 2026-07-05
+> 상태: P0~P6 완료·배포 라이브. P7 시각 디자인 "Outliner Ink" 1·2차 main 반영·배포(§6 세션5·6). 실기기 확인 반복 중 · 최종 갱신 2026-07-05
 
 ## 1. 확정된 결정
 | 항목 | 결정 | 비고 |
@@ -68,7 +68,7 @@
 - [x] P4 · GitHub Actions 배포 파이프라인 (`.github/workflows/deploy.yml`: npm ci→verify:domain→build→E2E 게이트→wrangler pages deploy, §6.2 함정 회피). 프록시용 `deploy-proxy.yml` 별도.
 - [x] P5 · Playwright E2E 스켈레톤 (`playwright.config.ts` + `e2e/dashboard-flow.spec.ts`) — `npm run build && npm run test:e2e`로 프로덕션 빌드(dist/) 대상 통과 확인. `deploy.yml`의 E2E 게이트가 이제 실제로 존재하는 스크립트를 참조함
 - [x] P6 · PWA 설치 지원 (manifest-only, **오프라인은 범위 밖**) — `public/manifest.webmanifest`, 아이콘 4종(192/512/maskable-512/apple-touch-180, favicon.svg 래스터화), `index.html`에 manifest·theme-color·iOS 메타 추가. `npm run build`로 `dist/`에 포함·index.html 참조 확인. 실기기 "홈 화면에 추가" 테스트는 배포 후 사용자 확인 필요. REQUIREMENTS §7 정정 + §9 신설.
-- [~] P7 · 시각 디자인 "Outliner Ink" (디자인만, 동작 불변) — `src/index.css` `@theme` 토큰 + Google Fonts(Fraunces/Inter/Noto Serif KR/Noto Sans KR), 컴포넌트·화면 restyle(emerald→brand 보라, paper 배경, 세리프 제목, rounded-lg 칩, 레일 보라 틴트), manifest/theme-color=paper. `npm run build` 통과·토큰 유틸 생성 확인. REQUIREMENTS §5.1 신설. **브랜치 `design/outliner-ink`에서 작업 → 실기기 확인 후 main 병합 예정.** 인라인 서식·검색·카테고리 색은 범위 밖(후속).
+- [~] P7 · 시각 디자인 "Outliner Ink" (디자인만, 동작 불변) — **main 직접 반영**. 1차: `@theme` 토큰+웹폰트(Fraunces/Inter/Noto KR), emerald→brand 보라, 세리프 제목. 2차(프로토타입 근접): 배경 심화 `#F1ECE2`, 카드 세리프 제목+여백/구분+rounded-2xl, 카테고리 순서기반 색 팔레트(활성 칩 채움·상세 라벨 점). REQUIREMENTS §5.1/§5.1.1. 하단 탭바·검색·인라인 서식은 미도입(후속). `npm run build` 통과, 배포 성공.
 
 ## 4. 개발 워크플로
 `WEB_DEV_GUIDE.md` 그대로 따름 — 의미 있는 단위마다 즉시 commit, 애매한 UX 결정은 짧은 질문으로 확인 후 진행.
@@ -92,5 +92,6 @@
 - **2026-07-04 (세션 3)**: 실사용 버그 2건 발견/수정.
   1) 배포된 앱에서 "Pull" 클릭 시 `Buffer is not defined` — isomorphic-git이 브라우저에 없는 Node 전역 `Buffer`를 참조. `buffer` 패키지 + `src/polyfills.ts`로 해결, Playwright로 실제 Pull 버튼을 눌러 GitHub까지 요청이 도달함을 확인(가짜 토큰으로 401까지 도달).
   2) **🔴 사용자가 직접 리포트한 중대 버그**: "저장소 초기화/pull이 격리 지침을 위반, repo를 초기화시켜버림." 실제로는 GitHub 원격 자체가 리셋된 게 아니라, 사용자의 실제 vault 저장소(`koyoume/DataHub`)에서 카테고리 1개만 동기화했는데 무관한 카테고리 5개 + 루트 파일 2개(`WORKFLOW.md` 포함)가 HEAD에서 통째로 사라진 것 — GitHub API로 실제 커밋 diff를 까보고 재현·확인. 근본 원인: `pull()`의 `git.branch({checkout:true})`/`git.merge()`가 워킹 디렉토리·인덱스를 실제로 채우지 않아서, 이후 "파일 1개만 add→commit"이 인덱스에 없는 나머지 전부를 삭제해버림(Node 재현으로 정확한 메커니즘 확인). `git.checkout()`을 명시적으로 추가해 수정 + `assertIndexMatchesHead()` 안전장치(다른 파일이 사라질 것 같으면 커밋 자체를 거부) 추가 + 로컬 git smart-HTTP 서버 기반 회귀 테스트(`regressionIsolation.mjs`)로 재발 방지. `koyoume/DataHub`의 실제 삭제된 데이터는 git 히스토리에 남아있어 복구 가능하지만 아직 안 함(§5).
+- **2026-07-05 (세션 6)**: 라이브 확인 후 "프로토타입과 차이 큼" 피드백 — 배포는 정상(theme-color=#FBFAF7 확인), 원인은 1차가 리스킨(토큰만)이라 구조/느낌 변화가 은근했던 것. 2차 강화 결정·구현(브랜치 없이 main 직접): 배경 종이색 심화 `#F1ECE2`, 카드 제목 세리프+여백/헤어라인 구분+rounded-2xl, 카테고리 색 **순서 기반 팔레트**(`src/domain/categoryColor.ts`) → 활성 칩 색 채움·상세 라벨 색 점. 하단 탭바·검색·인라인 서식은 미도입(후속). `npm run build` 통과. REQUIREMENTS §5.1.1 신설. 이후 브랜치 없이 항상 main에서 작업하기로 함.
 - **2026-07-05 (세션 5)**: 디자인 리뉴얼. 두 방향(Outliner Ink / Quiet Precision) 프로토타입 비교 후 **A·Outliner Ink** 채택. 실코드 대조로 프로토타입의 구조 오해 정정(카드 카테고리 색 점 없음·제목 자동축소·check/comment 글리프·＋는 FAB). 이번 범위를 **"디자인만 + 저장소 직접 반영"** 으로 확정(검색 기능·인라인 서식·카테고리 색은 후속). 한글 렌더 위해 Fraunces/Inter에 Noto Serif/Sans KR 병기 결정. `src/index.css`에 `@theme` 토큰 신설 + 웹폰트 로드, 6개 컴포넌트/화면 restyle(emerald 전면 제거→brand 보라), manifest/theme-color를 paper로. `npm run build` 통과, dist CSS에 토큰 유틸(bg-brand/text-ink/…) 생성 확인. 별도 브랜치 `design/outliner-ink`로 푸시(main 직접 아님) — 실기기 확인 후 병합 대기. REQUIREMENTS §5.1 신설, P7 추가.
 - **2026-07-05 (세션 4)**: 사용자 질문 "왜 웹앱으로 저장(설치)이 안 되나?"에서 출발 — 확인 결과 `index.html`에 manifest/service worker/apple 메타가 전혀 없었음(원래 PWA가 Non-Goal이었기 때문). 사용자가 **설치만(manifest-only)** 범위로 선택. P6 구현: `favicon.svg`(보라 글리프)를 sharp로 흰 배경 중앙 배치 래스터화해 아이콘 4종 생성, `manifest.webmanifest` 작성, `index.html`에 링크·메타 추가. `theme_color`는 로고 보라가 아니라 앱 실제 크롬색인 중립 `#fafafa`로 선택(상태바가 헤더와 이어지도록). `npm run build`로 dist 포함 확인. 오프라인(service worker)은 명시적으로 범위 밖 유지 — 네트워크 없으면 안 열림. 향후 오프라인까지 원하면 vite-plugin-pwa로 확장 가능(현재 보류). REQUIREMENTS §7 정정 + §9 신설.

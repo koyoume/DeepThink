@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { ThoughtRow } from '../components/ThoughtRow.tsx'
 import { useAutoFitFontSize } from '../components/useAutoFit.ts'
+import { categoryColorByName } from '../domain/categoryColor.ts'
 import { useVaultStore } from '../store/vaultStore.ts'
 import { useTopicDetailState } from './useTopicDetailState.ts'
 
@@ -68,7 +69,11 @@ export function TopicDetailScreen({ topicId, onBack }: Props) {
         </div>
       </header>
 
-      <div className="px-4 pt-2">
+      <div className="flex items-center gap-2 px-4 pt-2">
+        <span
+          className="h-2.5 w-2.5 shrink-0 rounded-full"
+          style={{ backgroundColor: categoryColorByName(detail.state.category, categories.map((c) => c.name)) }}
+        />
         <select
           value={detail.state.category}
           onChange={(e) => detail.changeCategory(e.target.value)}
