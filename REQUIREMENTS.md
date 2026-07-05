@@ -173,6 +173,13 @@ interface Category {
 - **추가 방어**: `pointerup`뿐 아니라 `pointercancel`(브라우저가 제스처를 강제로 취소하는 경우 — 예: 시스템 UI 개입)도 동일하게 처리하도록 리스너 추가. 이것도 놓치면 같은 종류의 "눌어붙는 드래그" 상태를 만들 수 있음.
 - **칩도 동일 구조라 동일하게 수정**(카테고리는 이미 정상 동작했지만, 같은 잠재적 경쟁 상태를 안고 있었으므로 일관성·견고성을 위해 함께 수정).
 
+### 5.2.5 진짜 원인 — flexbox `min-width` 기본값 (2026-07-05, 6차 수정)
+사용자가 "가로 길이가 적절히 조절이 안 되어 있음"이라고 콕 집어줌 — 드래그 로직이 아니라 **정적 CSS 버그**였음. 이 환경엔 실제 브라우저가 없어(`playwright install`도 네트워크 정책상 `cdn.playwright.dev` 차단으로 실패) 렌더링을 직접 볼 수 없었지만, CSS를 한 줄씩 감사해서 확정적인 버그를 찾음.
+
+- **원인**: 카드 미리보기 줄의 `<span className="truncate ...">`가 `flex items-center` 행의 자식인데, **flex item의 기본 `min-width`는 `auto`** — `truncate`(=`overflow:hidden`+`white-space:nowrap`+`text-overflow:ellipsis`)가 걸려 있어도 `min-width:0`을 명시하지 않으면 flex item은 내용의 원래 폭(줄바꿈 없는 전체 텍스트 폭) 밑으로 줄어들길 거부한다. 결과적으로 미리보기 텍스트가 길면 그 행이, 그리고 카드 전체가 원래 컬럼 폭을 넘어 옆 카드 쪽으로 밀고 들어가 겹쳐 보였을 것으로 추정 — flexbox의 잘 알려진 함정(Tailwind에서 `truncate`만 걸고 `min-w-0`을 깜빡하는 흔한 실수).
+- **수정**: 미리보기 행(`flex`)과 텍스트 `span`(`truncate`) 둘 다에 `min-w-0` 추가. 방어적으로 카드 `<button>`엔 `w-full min-w-0`, 카드 그리드 래퍼 `<div>`엔 `min-w-0`도 명시적으로 추가(암묵적 stretch에 기대지 않고 명시).
+- **한계**: 여전히 실제 브라우저로 최종 확인은 못 했음 — 스크린샷이나 실기기 확인 필요.
+
 ## 6. 비기능 요구
 - 반응형: 데스크톱/모바일 브라우저 모두 대응(원본은 모바일 전용이었으나 웹은 양쪽 지원).
 - 편집 후 400ms debounce 저장 (원본 `TopicDetailViewModel.scheduleSave` 동일 패턴).

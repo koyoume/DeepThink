@@ -212,6 +212,7 @@ export function DashboardScreen({ onOpenTopic, onOpenSettings }: Props) {
               return (
                 <div
                   key={id}
+                  className="min-w-0"
                   ref={(el) => {
                     if (el) cardRefs.current.set(id, el)
                     else cardRefs.current.delete(id)
