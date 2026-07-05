@@ -60,6 +60,7 @@ export function CategoryChips({ names, selected, onSelect, onReorder }: Props) {
       }
     }
     function onUp() {
+      window.clearTimeout(timer)
       cleanup()
     }
     function cleanup() {

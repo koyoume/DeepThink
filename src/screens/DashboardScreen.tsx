@@ -67,6 +67,7 @@ export function DashboardScreen({ onOpenTopic, onOpenSettings }: Props) {
       }
     }
     function onUp() {
+      window.clearTimeout(timer)
       cleanup()
     }
     function cleanup() {
