@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { DashboardScreen } from './screens/DashboardScreen.tsx'
 import { SettingsScreen } from './screens/SettingsScreen.tsx'
 import { TopicDetailScreen } from './screens/TopicDetailScreen.tsx'
+import { Loading } from './components/Loading.tsx'
 import { useGitStore } from './store/gitStore.ts'
 import { useVaultStore } from './store/vaultStore.ts'
 
@@ -42,7 +43,7 @@ function App() {
   }
 
   if (!loaded) {
-    return <div className="flex min-h-screen items-center justify-center text-sm text-muted">불러오는 중…</div>
+    return <Loading />
   }
 
   if (screen.name === 'detail') {

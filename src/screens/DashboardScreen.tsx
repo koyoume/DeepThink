@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { CategoryChips } from '../components/CategoryChips.tsx'
 import { TopicCard } from '../components/TopicCard.tsx'
+import { EmptyState } from '../components/EmptyState.tsx'
 import { effectiveSelectedCategory, topicsInCategory, useVaultStore } from '../store/vaultStore.ts'
 import { useGitStore } from '../store/gitStore.ts'
 
@@ -61,11 +62,19 @@ export function DashboardScreen({ onOpenTopic, onOpenSettings }: Props) {
         주제 {shown.length}개 · 미리보기 {previewLines > 0 ? `최대 ${previewLines}줄` : '끔'}
       </p>
 
-      <div className="grid flex-1 grid-cols-2 content-start items-start gap-3.5 px-4 pb-28">
-        {shown.map((topic) => (
-          <TopicCard key={topic.id} topic={topic} previewLines={previewLines} onOpen={() => onOpenTopic(topic.id)} />
-        ))}
-      </div>
+      {shown.length === 0 ? (
+        <EmptyState
+          className="flex-1"
+          title="아직 주제가 없어요"
+          hint={current ? `우측 하단 ＋로 '${current}'에 첫 주제를 추가하세요.` : '우측 하단 ＋로 첫 주제를 추가하세요.'}
+        />
+      ) : (
+        <div className="grid flex-1 grid-cols-2 content-start items-start gap-3.5 px-4 pb-28">
+          {shown.map((topic) => (
+            <TopicCard key={topic.id} topic={topic} previewLines={previewLines} onOpen={() => onOpenTopic(topic.id)} />
+          ))}
+        </div>
+      )}
 
       <button
         type="button"

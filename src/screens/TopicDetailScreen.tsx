@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import { ThoughtRow } from '../components/ThoughtRow.tsx'
+import { EmptyState } from '../components/EmptyState.tsx'
+import { Loading } from '../components/Loading.tsx'
 import { useAutoFitFontSize } from '../components/useAutoFit.ts'
 import { categoryColorByName } from '../domain/categoryColor.ts'
 import { useVaultStore } from '../store/vaultStore.ts'
@@ -24,9 +26,7 @@ export function TopicDetailScreen({ topicId, onBack }: Props) {
   })
 
   if (!detail.state.loaded) {
-    return (
-      <div className="flex min-h-screen items-center justify-center text-sm text-neutral-500">불러오는 중…</div>
-    )
+    return <Loading />
   }
 
   function handleBack() {
@@ -53,10 +53,10 @@ export function TopicDetailScreen({ topicId, onBack }: Props) {
             ⋯
           </button>
           {menuOpen && (
-            <div className="absolute right-0 z-10 mt-1 w-40 rounded-lg border border-neutral-200 bg-white py-1 text-sm shadow-lg">
+            <div className="absolute right-0 z-10 mt-1 w-40 rounded-lg border border-line bg-surface py-1 text-sm shadow-lg">
               <button
                 type="button"
-                className="block w-full px-3 py-1.5 text-left text-red-600 hover:bg-red-50"
+                className="block w-full px-3 py-1.5 text-left text-danger hover:bg-danger-soft"
                 onClick={() => {
                   setMenuOpen(false)
                   detail.deleteTopic(onBack)
@@ -77,7 +77,7 @@ export function TopicDetailScreen({ topicId, onBack }: Props) {
         <select
           value={detail.state.category}
           onChange={(e) => detail.changeCategory(e.target.value)}
-          className="rounded-lg border border-line bg-surface px-3 py-1 text-xs text-muted"
+          className="rounded-lg border border-line bg-surface px-3 py-1 text-xs text-muted outline-none focus:border-brand"
         >
           {categories.map((c) => (
             <option key={c.name} value={c.name}>
@@ -120,7 +120,11 @@ export function TopicDetailScreen({ topicId, onBack }: Props) {
 
       <div className="flex-1 px-4 pb-24 pt-3">
         {detail.state.thoughts.length === 0 && (
-          <p className="py-8 text-center text-sm text-faint">아직 생각이 없습니다.</p>
+          <EmptyState
+            title="첫 생각을 적어보세요"
+            hint="아래 입력창에 한 줄씩 생각을 더할 수 있어요."
+            glyph="●"
+          />
         )}
         {detail.state.thoughts.map((t) => (
           <ThoughtRow

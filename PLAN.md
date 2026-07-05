@@ -74,6 +74,7 @@
 `WEB_DEV_GUIDE.md` 그대로 따름 — 의미 있는 단위마다 즉시 commit, 애매한 UX 결정은 짧은 질문으로 확인 후 진행.
 
 ## 5. 열린 항목 / 추후 결정
+- **인라인 서식(다음 디자인 범위, 예약됨)**: 굵게·이탤릭·밑줄·글자색. 생각 줄이 순수 `<input>`이라 렌더 불가 → 에디터 개조 필요(서식 렌더 구조 + 마크다운 코덱 round-trip·저장형식 결정). REQUIREMENTS §5.1.3 참조. 별도 세션.
 - 검색 동작 정의 (UI-DESIGN.md TODO에서 이월, 아직 미구현)
 - 카테고리 색상 커스터마이징 (추가/이름변경/삭제는 Settings 화면에 구현됨, 색은 없음)
 - 관련 자료 추가 UI (표시/삭제는 구현, 새로 추가하는 입력 폼은 없음)
@@ -82,6 +83,7 @@
 - **`koyoume/DataHub` 실제 데이터 복구**: §6 세션 3의 격리 보장 버그로 HEAD에서 사라진 카테고리 5개(Assets/Books/Dev(company)/Dev(personal)/Life) + `WORKFLOW.md`가 git 히스토리엔 남아있음(커밋 `e22f12b9`). 아직 복구 안 함 — 되돌리려면 해당 커밋에서 파일들을 복원해 새 커밋으로 다시 push 필요.
 
 ## 6. 세션 이력 (진행 로그)
+- **2026-07-05 (세션 9)**: 디자인 폴리시 — 빈/로딩 상태 + 상세·설정 화면 토큰 정합. 공용 `Loading`(브랜드 스피너)·`EmptyState`(옅은 보라 글리프+세리프 제목+힌트) 컴포넌트 신설. 대시보드 빈 상태(주제 0개)·상세 빈 생각·초기/상세 로딩 통일. 상세/설정/`ThoughtRow`의 하드코딩 색(`bg-white`·`neutral-*`·`red-*`) 전량 토큰화, `--color-danger`/`--color-danger-soft` 신설(위험 액션 전용). 설정 화면을 플랫 폼→섹션 카드(`Section`)로 그룹화, 입력 `focus:border-brand` 통일. `npm run build` 통과(타입체크 포함), dist CSS에 `.text-danger`/`.bg-danger-soft` 확인, 하드코딩 팔레트 0 확인. E2E는 이 환경에서 브라우저 미설치로 미실행 → CI 게이트가 커버. 인라인 서식은 다음 범위로 예약. REQUIREMENTS §5.1.3 신설. main 직접 push.
 - **2026-07-05 (세션 8)**: 실사용 버그 수정 — "홈 카드 박스가 노출 내용보다 크게 나옴". 원인은 `DashboardScreen.tsx` 카드 그리드가 `grid grid-cols-2`만 지정해 CSS Grid 기본 `align-items: stretch`로 같은 행의 짧은 카드가 긴 카드 높이로 늘어난 것(+`flex-1` 컨테이너의 기본 `align-content: stretch`가 행 트랙까지 부풀림). `content-start items-start` 추가로 카드가 자기 내용 높이만큼만 잡히도록 수정(동작·데이터·2열 배치 불변, 순수 레이아웃). `npm run build` 통과, dist CSS에 `.content-start`/`.items-start` 유틸 확인, main 직접 push. REQUIREMENTS §5.1.2 신설.
 - **2026-07-05 (세션 1)**: 웹 이식 킥오프. 핵심 결정 3가지 확인(클라이언트 사이드 git, 저장소 재구성, 새 UI 디자인). 계획 승인 후 P0 착수 — Android 코드 `android-backup/`, UI 문서 `docs/legacy-prototype/`로 이동, Vite+React+TS+Tailwind 스캐폴드 완료(build/dev 확인). 이어서 P1 도메인 로직 포팅: `models.ts`/`markdownCodec.ts`(Kotlin 4개 golden case 이식, round-trip 통과), `vaultStore.ts`(LightningFS, fake-indexeddb로 Node에서 검증). `enum` 대신 문자열 유니온 사용(tsconfig `erasableSyntaxOnly` 때문에 enum·parameter property 문법 모두 컴파일 에러 — Node 네이티브 TS 실행과 궁합 좋게 순수 타입 주석만 쓰도록 함).
   이어서 P2: `gitSync.ts`(isomorphic-git, JGitClient.kt/GitSyncRepositoryImpl.kt 로직 1:1), `settingsStore.ts`, Cloudflare Worker CORS 프록시(`proxy/`, `wrangler deploy --dry-run` 통과). 실제 GitHub 왕복 검증은 PAT가 필요해 사용자 선택으로 **보류**(추후 `npm run verify:git` 또는 P3 UI에서 실사용하며 검증) — `gitSync.ts`는 타입체크만 통과한 상태로 다음 단계 진행.

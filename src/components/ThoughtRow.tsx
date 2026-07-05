@@ -93,15 +93,15 @@ export function ThoughtRow(props: Props) {
           type="button"
           onClick={() => setMenuOpen((v) => !v)}
           aria-label="줄 메뉴"
-          className="rounded px-1 text-neutral-400 opacity-0 group-hover:opacity-100 focus:opacity-100"
+          className="rounded px-1 text-faint opacity-0 group-hover:opacity-100 focus:opacity-100"
         >
           ⋯
         </button>
         {menuOpen && (
-          <div className="absolute right-0 z-10 mt-1 w-32 rounded-lg border border-neutral-200 bg-white py-1 text-sm shadow-lg">
+          <div className="absolute right-0 z-10 mt-1 w-32 rounded-lg border border-line bg-surface py-1 text-sm shadow-lg">
             <button
               type="button"
-              className="block w-full px-3 py-1.5 text-left hover:bg-neutral-50"
+              className="block w-full px-3 py-1.5 text-left hover:bg-brand-soft"
               onClick={() => {
                 props.onToggleType()
                 setMenuOpen(false)
@@ -111,7 +111,7 @@ export function ThoughtRow(props: Props) {
             </button>
             <button
               type="button"
-              className="block w-full px-3 py-1.5 text-left hover:bg-neutral-50"
+              className="block w-full px-3 py-1.5 text-left hover:bg-brand-soft"
               onClick={() => {
                 props.onIndent()
                 setMenuOpen(false)
@@ -121,7 +121,7 @@ export function ThoughtRow(props: Props) {
             </button>
             <button
               type="button"
-              className="block w-full px-3 py-1.5 text-left hover:bg-neutral-50"
+              className="block w-full px-3 py-1.5 text-left hover:bg-brand-soft"
               onClick={() => {
                 props.onOutdent()
                 setMenuOpen(false)
@@ -131,7 +131,7 @@ export function ThoughtRow(props: Props) {
             </button>
             <button
               type="button"
-              className="block w-full px-3 py-1.5 text-left text-red-600 hover:bg-red-50"
+              className="block w-full px-3 py-1.5 text-left text-danger hover:bg-danger-soft"
               onClick={() => {
                 props.onDelete()
                 setMenuOpen(false)

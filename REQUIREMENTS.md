@@ -111,6 +111,19 @@ interface Category {
 - 수정: 그리드 컨테이너에 `content-start items-start` 추가(`align-content/​items: flex-start`). `items-start`=카드가 행 이웃에 안 끌려감, `content-start`=행이 위로 모여 트랙이 안 늘어남. `flex-1`은 스크롤 영역 확보용으로 유지(빈 공간만 아래로).
 - 불변: 동작·데이터·2열 배치 그대로. 순수 레이아웃 수정.
 
+### 5.1.3 화면 폴리시 · 빈/로딩 상태 (2026-07-05)
+대시보드 대비 상세·설정 화면에 남아 있던 하드코딩 색을 토큰으로 통일하고, 빈/로딩 상태를 브랜드 언어로 정리. **순수 시각(동작·데이터·네비 불변).**
+- **danger 토큰 신설**: `--color-danger #C4453D`(종이 팔레트에 맞춘 차분한 레드) / `--color-danger-soft #F7E7E5`(hover 배경). 삭제 등 위험 액션에만 사용. 기존 하드코딩 `text-red-*`/`hover:bg-red-*` 전량 대체.
+- **토큰 정합(전 화면)**: `bg-white`→`bg-surface`, `text-neutral-*`→`text-muted`/`text-faint`, `border-neutral-*`→`border-line`. 상세 화면(주제 메뉴)·`ThoughtRow`(줄 메뉴)·설정 화면 모두 적용. 하드코딩 팔레트 0.
+- **공용 컴포넌트**:
+  - `Loading`(`src/components/Loading.tsx`): 브랜드 보라 스피너 + muted 라벨. App 초기 로딩·상세 로딩 공통 사용(기존 각기 다른 맨텍스트 통일).
+  - `EmptyState`(`src/components/EmptyState.tsx`): 옅은 보라 원 글리프 + 세리프 제목 + muted 힌트. 재사용.
+- **빈 상태 적용**:
+  - 대시보드: 선택 카테고리에 주제 0개일 때(기존엔 빈 그리드) → "아직 주제가 없어요" + "＋로 첫 주제 추가" 힌트.
+  - 상세: 생각 0개 → "첫 생각을 적어보세요" + 하단 입력 유도 힌트(기존 "아직 생각이 없습니다." 대체).
+- **설정 화면 그룹화**: 플랫 폼 → 섹션 카드(`Section` 로컬 컴포넌트: 소제목 + `rounded-2xl border-line bg-surface` 카드)로 위계 부여. 입력 필드 `focus:border-brand`·`placeholder:text-faint` 통일, 버튼 hover 트랜지션 추가. 그룹: Git 저장소 / CORS 프록시 / 동기화 / 미리보기 기본 줄 수 / 카테고리 관리.
+- **예약(다음 범위)**: 인라인 서식(굵게·이탤릭·밑줄·글자색). 현재 생각 줄이 순수 `<input>`이라 렌더 불가 → 에디터를 서식 렌더 가능한 구조로 개조 필요(마크다운 코덱 round-trip·저장형식 결정 포함). 별도 세션에서 진행.
+
 ## 6. 비기능 요구
 - 반응형: 데스크톱/모바일 브라우저 모두 대응(원본은 모바일 전용이었으나 웹은 양쪽 지원).
 - 편집 후 400ms debounce 저장 (원본 `TopicDetailViewModel.scheduleSave` 동일 패턴).
