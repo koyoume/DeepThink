@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import { CategoryChips } from '../components/CategoryChips.tsx'
 import { TopicCard } from '../components/TopicCard.tsx'
 import { EmptyState } from '../components/EmptyState.tsx'
@@ -42,9 +42,76 @@ export function DashboardScreen({ onOpenTopic, onOpenSettings }: Props) {
     dx: number
     dy: number
     order: string[]
+    initialOrder: string[]
   }
   const [cardDrag, setCardDrag] = useState<CardDragState | null>(null)
   const cardSuppressClick = useRef<Set<string>>(new Set())
+
+  /** 롱프레스가 확정된 그 즉시(같은 틱) 드래그용 리스너까지 동기적으로 붙인다.
+   *  이걸 별도 useEffect로 분리하면, 상태 반영과 리스너 부착 사이의 틈에 pointerup이 끼어들 때
+   *  아무도 못 받아서 cardDrag가 영원히 안 풀리는 경쟁 상태(유령 카드 겹침의 원인)가 생길 수 있다. */
+  function activateCardDrag(id: string, startClientX: number, startClientY: number) {
+    const el = cardRefs.current.get(id)
+    const r = el?.getBoundingClientRect()
+    if (!r) return
+    cardSuppressClick.current.add(id)
+    const initialOrder = shown.map((t) => t.id)
+    setCardDrag({
+      id,
+      originLeft: r.left,
+      originTop: r.top,
+      originWidth: r.width,
+      originHeight: r.height,
+      startClientX,
+      startClientY,
+      dx: 0,
+      dy: 0,
+      order: initialOrder,
+      initialOrder,
+    })
+
+    function onMove(e: PointerEvent) {
+      setCardDrag((d) => {
+        if (!d) return d
+        const dx = e.clientX - d.startClientX
+        const dy = e.clientY - d.startClientY
+        const restIds = d.order.filter((cid) => cid !== d.id)
+        let bestIdx = restIds.length
+        let bestDist = Infinity
+        restIds.forEach((cid, i) => {
+          const cardEl = cardRefs.current.get(cid)
+          const cr = cardEl?.getBoundingClientRect()
+          if (!cr) return
+          const cx = cr.left + cr.width / 2
+          const cy = cr.top + cr.height / 2
+          const dist = (cx - e.clientX) ** 2 + (cy - e.clientY) ** 2
+          if (dist < bestDist) {
+            bestDist = dist
+            bestIdx = i
+          }
+        })
+        const newOrder = [...restIds.slice(0, bestIdx), d.id, ...restIds.slice(bestIdx)]
+        const changed = newOrder.some((cid, i) => cid !== d.order[i])
+        return { ...d, dx, dy, order: changed ? newOrder : d.order }
+      })
+    }
+    function onUp() {
+      window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('pointerup', onUp)
+      window.removeEventListener('pointercancel', onUp)
+      setCardDrag((d) => {
+        if (d) {
+          const changed = d.order.some((cid, i) => cid !== d.initialOrder[i])
+          if (changed && current) void reorderTopicsInCategory(current, d.order)
+          window.setTimeout(() => cardSuppressClick.current.delete(d.id), 50)
+        }
+        return null
+      })
+    }
+    window.addEventListener('pointermove', onMove)
+    window.addEventListener('pointerup', onUp)
+    window.addEventListener('pointercancel', onUp)
+  }
 
   function handleCardPointerDown(id: string, e: React.PointerEvent) {
     const startX = e.clientX
@@ -73,78 +140,17 @@ export function DashboardScreen({ onOpenTopic, onOpenSettings }: Props) {
     function cleanup() {
       window.removeEventListener('pointermove', onMove)
       window.removeEventListener('pointerup', onUp)
+      window.removeEventListener('pointercancel', onUp)
     }
     window.addEventListener('pointermove', onMove)
     window.addEventListener('pointerup', onUp)
+    window.addEventListener('pointercancel', onUp)
     const timer = window.setTimeout(() => {
       timerFired = true
       cleanup()
-      const el = cardRefs.current.get(id)
-      const r = el?.getBoundingClientRect()
-      if (!r) return
-      cardSuppressClick.current.add(id)
-      setCardDrag({
-        id,
-        originLeft: r.left,
-        originTop: r.top,
-        originWidth: r.width,
-        originHeight: r.height,
-        startClientX: lastX,
-        startClientY: lastY,
-        dx: 0,
-        dy: 0,
-        order: shown.map((t) => t.id),
-      })
+      activateCardDrag(id, lastX, lastY)
     }, LONG_PRESS_MS)
   }
-
-  // 드래그 중: 포인터 위치로 실시간 삽입 지점을 다시 측정해 다른 카드가 실제로 자리를 비켜주게 한다(겹침 방지).
-  useEffect(() => {
-    if (!cardDrag) return
-    function onMove(e: PointerEvent) {
-      setCardDrag((d) => {
-        if (!d) return d
-        const dx = e.clientX - d.startClientX
-        const dy = e.clientY - d.startClientY
-        const restIds = d.order.filter((cid) => cid !== d.id)
-        let bestIdx = restIds.length
-        let bestDist = Infinity
-        restIds.forEach((cid, i) => {
-          const el = cardRefs.current.get(cid)
-          const r = el?.getBoundingClientRect()
-          if (!r) return
-          const cx = r.left + r.width / 2
-          const cy = r.top + r.height / 2
-          const dist = (cx - e.clientX) ** 2 + (cy - e.clientY) ** 2
-          if (dist < bestDist) {
-            bestDist = dist
-            bestIdx = i
-          }
-        })
-        const newOrder = [...restIds.slice(0, bestIdx), d.id, ...restIds.slice(bestIdx)]
-        const changed = newOrder.some((cid, i) => cid !== d.order[i])
-        return { ...d, dx, dy, order: changed ? newOrder : d.order }
-      })
-    }
-    function onUp() {
-      setCardDrag((d) => {
-        if (d) {
-          const original = shown.map((t) => t.id)
-          const changed = d.order.some((cid, i) => cid !== original[i])
-          if (changed && current) void reorderTopicsInCategory(current, d.order)
-          window.setTimeout(() => cardSuppressClick.current.delete(d.id), 50)
-        }
-        return null
-      })
-    }
-    window.addEventListener('pointermove', onMove)
-    window.addEventListener('pointerup', onUp, { once: true })
-    return () => {
-      window.removeEventListener('pointermove', onMove)
-      window.removeEventListener('pointerup', onUp)
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cardDrag?.id])
 
   function cyclePreviewLines() {
     setPreviewOverride(previewLines <= 0 ? 3 : previewLines - 1)

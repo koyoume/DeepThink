@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import { categoryColorByIndex } from '../domain/categoryColor.ts'
 
 interface Props {
@@ -30,8 +30,61 @@ export function CategoryChips({ names, selected, onSelect, onReorder }: Props) {
     startClientX: number
     dx: number
     order: string[]
+    initialOrder: string[]
   }
   const [drag, setDrag] = useState<DragState | null>(null)
+
+  /** 롱프레스가 확정된 그 즉시(같은 틱) 드래그용 리스너까지 동기적으로 붙인다.
+   *  별도 useEffect로 분리하면 상태 반영과 리스너 부착 사이의 틈에 pointerup이 끼어들 때
+   *  아무도 못 받아서 drag가 영원히 안 풀리는 경쟁 상태(유령 칩 겹침의 원인)가 생길 수 있다. */
+  function activateChipDrag(name: string, startClientX: number) {
+    const el = chipRefs.current.get(name)
+    const r = el?.getBoundingClientRect()
+    if (!r) return
+    suppressClick.current.add(name)
+    const initialOrder = names
+    setDrag({ id: name, originLeft: r.left, originTop: r.top, originWidth: r.width, startClientX, dx: 0, order: initialOrder, initialOrder })
+
+    function onMove(e: PointerEvent) {
+      setDrag((d) => {
+        if (!d) return d
+        const dx = e.clientX - d.startClientX
+        const restIds = d.order.filter((n) => n !== d.id)
+        let bestIdx = restIds.length
+        let bestDist = Infinity
+        restIds.forEach((n, i) => {
+          const chipEl = chipRefs.current.get(n)
+          const cr = chipEl?.getBoundingClientRect()
+          if (!cr) return
+          const cx = cr.left + cr.width / 2
+          const dist = Math.abs(cx - e.clientX)
+          if (dist < bestDist) {
+            bestDist = dist
+            bestIdx = i
+          }
+        })
+        const newOrder = [...restIds.slice(0, bestIdx), d.id, ...restIds.slice(bestIdx)]
+        const changed = newOrder.some((n, i) => n !== d.order[i])
+        return { ...d, dx, order: changed ? newOrder : d.order }
+      })
+    }
+    function onUp() {
+      window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('pointerup', onUp)
+      window.removeEventListener('pointercancel', onUp)
+      setDrag((d) => {
+        if (d) {
+          const changed = d.order.some((n, i) => n !== d.initialOrder[i])
+          if (changed) onReorder?.(d.order)
+          window.setTimeout(() => suppressClick.current.delete(d.id), 50)
+        }
+        return null
+      })
+    }
+    window.addEventListener('pointermove', onMove)
+    window.addEventListener('pointerup', onUp)
+    window.addEventListener('pointercancel', onUp)
+  }
 
   function handlePointerDown(name: string, e: React.PointerEvent) {
     const startX = e.clientX
@@ -66,64 +119,18 @@ export function CategoryChips({ names, selected, onSelect, onReorder }: Props) {
     function cleanup() {
       window.removeEventListener('pointermove', onMove)
       window.removeEventListener('pointerup', onUp)
+      window.removeEventListener('pointercancel', onUp)
     }
     window.addEventListener('pointermove', onMove)
     window.addEventListener('pointerup', onUp)
+    window.addEventListener('pointercancel', onUp)
     const timer = window.setTimeout(() => {
       timerFired = true
       cleanup()
       if (!onReorder) return
-      const el = chipRefs.current.get(name)
-      const r = el?.getBoundingClientRect()
-      if (!r) return
-      suppressClick.current.add(name)
-      setDrag({ id: name, originLeft: r.left, originTop: r.top, originWidth: r.width, startClientX: lastX, dx: 0, order: names })
+      activateChipDrag(name, lastX)
     }, LONG_PRESS_MS)
   }
-
-  useEffect(() => {
-    if (!drag) return
-    function onMove(e: PointerEvent) {
-      setDrag((d) => {
-        if (!d) return d
-        const dx = e.clientX - d.startClientX
-        const restIds = d.order.filter((n) => n !== d.id)
-        let bestIdx = restIds.length
-        let bestDist = Infinity
-        restIds.forEach((n, i) => {
-          const el = chipRefs.current.get(n)
-          const r = el?.getBoundingClientRect()
-          if (!r) return
-          const cx = r.left + r.width / 2
-          const dist = Math.abs(cx - e.clientX)
-          if (dist < bestDist) {
-            bestDist = dist
-            bestIdx = i
-          }
-        })
-        const newOrder = [...restIds.slice(0, bestIdx), d.id, ...restIds.slice(bestIdx)]
-        const changed = newOrder.some((n, i) => n !== d.order[i])
-        return { ...d, dx, order: changed ? newOrder : d.order }
-      })
-    }
-    function onUp() {
-      setDrag((d) => {
-        if (d) {
-          const changed = d.order.some((n, i) => n !== names[i])
-          if (changed) onReorder?.(d.order)
-          window.setTimeout(() => suppressClick.current.delete(d.id), 50)
-        }
-        return null
-      })
-    }
-    window.addEventListener('pointermove', onMove)
-    window.addEventListener('pointerup', onUp, { once: true })
-    return () => {
-      window.removeEventListener('pointermove', onMove)
-      window.removeEventListener('pointerup', onUp)
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [drag?.id])
 
   const displayNames = drag ? drag.order.filter((n) => n !== drag.id) : names
 
