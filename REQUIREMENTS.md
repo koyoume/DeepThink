@@ -233,6 +233,7 @@ interface Category {
 
 - **수정**: `truncate` 제거, `whitespace-normal break-words`로 교체 — 긴 줄은 잘리지 않고 여러 줄로 줄바꿈되어 전체 표시됨(줄 높이는 내용만큼 늘어남).
 - **범위**: 이번엔 글쓰기 화면 개별 줄(`ThoughtRow`)만 수정. 대시보드의 주제 카드 미리보기(`TopicCard.tsx`)와 주제 제목(`DashboardScreen.tsx`), 관련자료 칩 제목(`TopicDetailScreen.tsx`)은 카드/리스트 공간이 제한적이라 여전히 `truncate` 유지 — 필요하면 별도로 논의.
+- **후속(같은 세션, 편집 모드도 동일 문제)**: 보기 모드는 고쳤지만 편집 중(`<input type="text">`)에는 가로 스크롤만 되고 줄바꿈이 안 돼 긴 문장 작성이 어렵다는 지적. `<input>`을 `<textarea rows={1}>`로 교체하고, 입력할 때마다(`onChange`)·포커스 시·`thought.text` 변경 시 `scrollHeight` 기준으로 높이를 자동 조절(`autoResize`)하도록 함. Enter는 여전히 `preventDefault`로 막아 줄바꿈 문자가 아니라 새 줄(`onEnter`) 생성으로 연결(§5.5 동작 그대로), Tab/Backspace-at-start 핸들러도 textarea 이벤트 타입으로만 변경, 로직 불변. `npm run build`/`lint`/`verify:domain` 통과.
 
 ## 6. 비기능 요구
 - 반응형: 데스크톱/모바일 브라우저 모두 대응(원본은 모바일 전용이었으나 웹은 양쪽 지원).

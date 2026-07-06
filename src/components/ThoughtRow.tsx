@@ -24,22 +24,37 @@ interface Props {
  *  길게 누르기(⋯ 버튼) 메뉴. */
 export function ThoughtRow(props: Props) {
   const { thought } = props
-  const inputRef = useRef<HTMLInputElement | null>(null)
+  const inputRef = useRef<HTMLTextAreaElement | null>(null)
   const [menuOpen, setMenuOpen] = useState(false)
   const [focused, setFocused] = useState(false)
+
+  function autoResize(el: HTMLTextAreaElement | null) {
+    if (!el) return
+    el.style.height = 'auto'
+    el.style.height = `${el.scrollHeight}px`
+  }
 
   const onFocusHandled = props.onFocusHandled
   useEffect(() => {
     if (props.focusRequested && inputRef.current) {
       inputRef.current.focus()
+      autoResize(inputRef.current)
       onFocusHandled()
     }
   }, [props.focusRequested, onFocusHandled])
 
   // 렌더 뷰(blur 상태)를 클릭해 편집 모드로 전환할 때, input이 막 마운트된 뒤 포커스를 옮긴다.
   useEffect(() => {
-    if (focused) inputRef.current?.focus()
+    if (focused) {
+      inputRef.current?.focus()
+      autoResize(inputRef.current)
+    }
   }, [focused])
+
+  // 텍스트가 바뀔 때마다(타이핑 포함) 줄바꿈으로 늘어난 높이를 반영.
+  useEffect(() => {
+    autoResize(inputRef.current)
+  }, [thought.text])
 
   function handleFocus() {
     props.onFocus()
@@ -51,7 +66,7 @@ export function ThoughtRow(props: Props) {
     setFocused(false)
   }
 
-  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+  function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
     if (e.key === 'Enter') {
       e.preventDefault()
       props.onEnter()
@@ -92,17 +107,20 @@ export function ThoughtRow(props: Props) {
           {renderInlineFormatted(thought.text)}
         </button>
       ) : (
-        <input
+        <textarea
           ref={inputRef}
-          type="text"
           data-testid="thought-input"
           value={thought.text}
           placeholder="생각을 입력하세요"
-          onChange={(e) => props.onTextChange(e.target.value)}
+          rows={1}
+          onChange={(e) => {
+            props.onTextChange(e.target.value)
+            autoResize(e.target)
+          }}
           onKeyDown={handleKeyDown}
           onFocus={handleFocus}
           onBlur={handleBlur}
-          className={`min-w-0 flex-1 bg-transparent text-sm outline-none ${
+          className={`min-w-0 flex-1 resize-none overflow-hidden whitespace-pre-wrap break-words bg-transparent text-sm leading-normal outline-none ${
             thought.type === 'check' && thought.done ? 'text-faint line-through' : 'text-ink'
           }`}
         />
