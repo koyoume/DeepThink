@@ -70,7 +70,7 @@ interface Category {
 - git 동기화는 **카테고리별로 해당 md 파일 1개만** add/commit/push — repo의 다른 파일은 절대 건드리지 않음(원본 불변 조건 유지).
 - **PAT 저장**: `localStorage`에 평문 저장(remoteUrl/username/token/authorName/authorEmail). Android의 EncryptedSharedPreferences 같은 안전한 저장소가 브라우저엔 없음 — 개인용 도구라는 전제 하의 의도적 트레이드오프. **정정 여지**: 나중에 passphrase 기반 Web Crypto 암호화를 추가할 수 있음(현재 범위 아님).
 - **CORS 프록시**: git 호스트가 브라우저 CORS를 지원하지 않아 Cloudflare Worker로 투명 프록시 필요(git 로직에 관여하지 않는 순수 바이트 릴레이).
-- **자동 병합 (2026-07-05, 14차 수정)**: 웹앱이 기본 편집 경로지만, 다른 경로(GitHub 웹, 다른 기기의 git clone 등)로 repo를 직접 고칠 수도 있다는 전제 하에, "설정 > 동기화"를 누르면(개별 카테고리 동기화 버튼이든 Pull이든) **항상 자동으로 병합**되어야 하고 사용자에게 충돌 해결 화면을 절대 띄우지 않는다.
+- **자동 병합 (2026-07-05, 14차 수정)**: 웹앱이 기본 편집 경로지만, 다른 경로(GitHub 웹, 다른 기기의 git clone 등)로 repo를 직접 고칠 수도 있다는 전제 하에, "설정 > 동기화"를 누르면(개별 카테고리 동기화 버튼이든 Pull이든) **항상 자동으로 병합**되어야 하고 사용자에게 충돌 해결 화면을 절대 띄우지 않는다. (2026-07-19 15차: 대시보드 헤더 ⟳ 버튼으로도 현재 카테고리를 동기화할 수 있음 — §5.7. 동일한 자동 병합 경로를 탄다.)
   - 병합 단위는 카테고리 md 파일의 **줄(=대부분 생각 한 줄) 단위 3-way 병합**(`diff3` 알고리즘). Thought.id는 파일에 저장되지 않고 파싱 때마다 새로 생성되는 값이라(§8) ID 기반 병합 대상 자체가 없고, 파일을 그대로 줄 단위로 병합하는 것이 곧 "생각 단위 병합"과 동일한 효과.
   - 진짜 충돌(같은 줄을 로컬·원격이 서로 다르게 고친 경우)도 사용자에게 묻지 않고 **자동으로 둘 다 보존**한다: 원격(remote) 버전을 유지하고, 로컬에서 다르게 고친 버전을 바로 아래 줄에 이어붙인다. 데이터 유실은 없지만, 결과적으로 그 생각이 두 줄로 보일 수 있음(사용자가 다시 정리 가능).
   - 구현: isomorphic-git `merge()`의 `mergeDriver` 옵션에 커스텀 `silentMergeDriver`(`src/git/silentMergeDriver.ts`)를 꽂아 항상 `cleanMerge:true`를 반환 — 기본 mergeDriver(`<<<<<<<` 충돌 마커 삽입 후 `cleanMerge:false`)를 대체. `pull()`은 기존처럼 우선 fast-forward만 시도하고, `Errors.FastForwardError`가 나면 이 mergeDriver로 실제 3-way 병합을 수행(`mergeWithRemote` 헬퍼로 공통화). `syncCategory()`는 push가 (isomorphic-git이 `{ok:false}`가 아니라 **`Errors.PushRejectedError` 예외**로 던지는 점에 주의) non-fast-forward로 거부되면 자동으로 fetch+병합 후 재push하며, 레이스 대비 최대 3회까지 재시도.
@@ -240,6 +240,15 @@ interface Category {
 - **수정**: `truncate` 제거, `whitespace-normal break-words`로 교체 — 긴 줄은 잘리지 않고 여러 줄로 줄바꿈되어 전체 표시됨(줄 높이는 내용만큼 늘어남).
 - **범위**: 이번엔 글쓰기 화면 개별 줄(`ThoughtRow`)만 수정. 대시보드의 주제 카드 미리보기(`TopicCard.tsx`)와 주제 제목(`DashboardScreen.tsx`), 관련자료 칩 제목(`TopicDetailScreen.tsx`)은 카드/리스트 공간이 제한적이라 여전히 `truncate` 유지 — 필요하면 별도로 논의.
 - **후속(같은 세션, 편집 모드도 동일 문제)**: 보기 모드는 고쳤지만 편집 중(`<input type="text">`)에는 가로 스크롤만 되고 줄바꿈이 안 돼 긴 문장 작성이 어렵다는 지적. `<input>`을 `<textarea rows={1}>`로 교체하고, 입력할 때마다(`onChange`)·포커스 시·`thought.text` 변경 시 `scrollHeight` 기준으로 높이를 자동 조절(`autoResize`)하도록 함. Enter는 여전히 `preventDefault`로 막아 줄바꿈 문자가 아니라 새 줄(`onEnter`) 생성으로 연결(§5.5 동작 그대로), Tab/Backspace-at-start 핸들러도 textarea 이벤트 타입으로만 변경, 로직 불변. `npm run build`/`lint`/`verify:domain` 통과.
+
+## 5.7 대시보드 상단 현재 카테고리 동기화 버튼 (2026-07-19, 15차 수정)
+기존엔 카테고리별 동기화가 **설정 화면**에만 있어, 글을 쓰다 동기화하려면 설정까지 들어가야 했다. 사용자 요청으로 대시보드 상단(헤더)에서 현재 선택된 카테고리를 바로 동기화할 수 있게 한다.
+
+- **배치**: 대시보드 헤더의 [순서 편집] [미리보기] 버튼 우측, [설정] 왼쪽에 아이콘 버튼(⟳) 하나 추가(사용자가 헤더 아이콘 방식으로 확정). 헤더가 좁은 폰에서 넘치지 않도록 텍스트 없는 컴팩트 아이콘으로 처리.
+- **대상**: 현재 화면에 선택된 카테고리(`effectiveSelectedCategory`) 1개. 기존 `syncCategoryGit(name)`을 그대로 호출하므로 §4의 카테고리 격리·자동 병합 보장이 동일하게 적용됨(다른 파일 불변, 충돌 화면 없음).
+- **상태 표시**: 해당 카테고리 동기화 중이면(`syncingCategory === current`) ⟳ 아이콘이 `animate-spin`으로 회전. git 작업 중(`busy`)이거나 카테고리가 없거나 원격 미설정(`gitConfig.remoteUrl` 비어 있음)이면 비활성(`disabled`, 흐리게) 처리.
+- **결과 피드백**: 기존엔 동기화 결과 메시지(`gitStore.message`)가 설정 화면에만 배너로 떴다. 대시보드에서 동기화하면 결과를 볼 수 없으므로, 대시보드에도 하단(FAB 위, `bottom-24`) 플로팅 토스트를 추가해 메시지를 3초간 표시 후 자동 소멸(`consumeMessage`). 다른 화면에서 넘어올 때 남아 있던 메시지는 마운트 시 조용히 소비하고 토스트로 띄우지 않음(마운트 플래시 방지).
+- **불변**: 설정 화면의 기존 카테고리별 동기화 버튼은 그대로 유지. 저장 포맷·git sync 대상 파일 구조 변경 없음.
 
 ## 6. 비기능 요구
 - 반응형: 데스크톱/모바일 브라우저 모두 대응(원본은 모바일 전용이었으나 웹은 양쪽 지원).

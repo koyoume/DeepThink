@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { CategoryChips } from '../components/CategoryChips.tsx'
 import { TopicCard } from '../components/TopicCard.tsx'
 import { EmptyState } from '../components/EmptyState.tsx'
@@ -21,12 +21,47 @@ export function DashboardScreen({ onOpenTopic, onOpenSettings }: Props) {
   const reorderCategories = useVaultStore((s) => s.reorderCategories)
   const reorderTopicsInCategory = useVaultStore((s) => s.reorderTopicsInCategory)
   const settingPreviewLines = useGitStore((s) => s.previewLines)
+  const syncCategoryGit = useGitStore((s) => s.syncCategoryGit)
+  const syncingCategory = useGitStore((s) => s.syncingCategory)
+  const busy = useGitStore((s) => s.busy)
+  const remoteUrl = useGitStore((s) => s.gitConfig.remoteUrl)
+  const message = useGitStore((s) => s.message)
+  const consumeMessage = useGitStore((s) => s.consumeMessage)
 
   const [previewOverride, setPreviewOverride] = useState<number | null>(null)
   const [editingOrder, setEditingOrder] = useState(false)
+  const [toast, setToast] = useState<string | null>(null)
+  const seenInitialMessage = useRef(false)
   const previewLines = previewOverride ?? settingPreviewLines
   const current = effectiveSelectedCategory({ categories, selectedCategory })
   const shown = topicsInCategory(topics, current)
+  const remoteConfigured = remoteUrl.trim() !== ''
+  const syncingCurrent = syncingCategory === current
+
+  // git 액션이 남긴 결과 메시지를 대시보드에서도 잠깐 토스트로 보여준다.
+  // 마운트 시점에 남아 있던(다른 화면에서 생긴) 메시지는 조용히 소비하고 토스트는 띄우지 않는다.
+  useEffect(() => {
+    if (!seenInitialMessage.current) {
+      seenInitialMessage.current = true
+      if (message) consumeMessage()
+      return
+    }
+    if (message) {
+      setToast(message)
+      consumeMessage()
+    }
+  }, [message, consumeMessage])
+
+  useEffect(() => {
+    if (!toast) return
+    const timer = setTimeout(() => setToast(null), 3000)
+    return () => clearTimeout(timer)
+  }, [toast])
+
+  function handleSync() {
+    if (!current || !remoteConfigured || busy) return
+    void syncCategoryGit(current)
+  }
 
   function moveTopic(index: number, dir: -1 | 1) {
     const target = index + dir
@@ -66,6 +101,16 @@ export function DashboardScreen({ onOpenTopic, onOpenSettings }: Props) {
             className="rounded-lg border border-line px-3 py-1 text-xs text-muted transition-colors hover:bg-brand-soft"
           >
             미리보기 {previewLines > 0 ? `${previewLines}줄` : '끔'}
+          </button>
+          <button
+            type="button"
+            onClick={handleSync}
+            disabled={!current || !remoteConfigured || busy}
+            aria-label={current ? `'${current}' 카테고리 동기화` : '동기화'}
+            title={remoteConfigured ? '현재 카테고리 동기화' : 'Git 저장소를 먼저 설정하세요'}
+            className="rounded-lg border border-line px-2.5 py-1 text-sm text-muted transition-colors hover:bg-brand-soft disabled:opacity-40"
+          >
+            <span className={`inline-block ${syncingCurrent ? 'animate-spin' : ''}`}>⟳</span>
           </button>
           <button
             type="button"
@@ -130,6 +175,14 @@ export function DashboardScreen({ onOpenTopic, onOpenSettings }: Props) {
               <TopicCard key={topic.id} topic={topic} previewLines={previewLines} onOpen={() => onOpenTopic(topic.id)} />
             ),
           )}
+        </div>
+      )}
+
+      {toast && (
+        <div className="pointer-events-none fixed inset-x-0 bottom-24 z-20 flex justify-center px-4">
+          <div className="max-w-md rounded-lg border border-line bg-surface px-3 py-2 text-sm text-muted shadow-lg">
+            {toast}
+          </div>
         </div>
       )}
 
