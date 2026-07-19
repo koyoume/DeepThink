@@ -275,7 +275,7 @@ export function TopicDetailScreen({ topicId, onBack }: Props) {
                 onBlur={() => detail.clearFocused(t.id)}
                 onTextChange={(text) => detail.setText(t.id, text)}
                 onCycleType={() => detail.cycleType(t.id)}
-                onEnter={() => detail.addAfter(t.id)}
+                onEnter={(before, after) => detail.splitThought(t.id, before, after)}
                 onBackspaceAtStart={() => {
                   if (t.text === '') detail.deleteThought(t.id)
                 }}

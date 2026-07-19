@@ -91,6 +91,24 @@ export function useTopicDetailState(topicId: string) {
     }))
   }
 
+  /** id 줄을 커서 기준으로 분리: 현재 줄엔 before, 바로 아래 새 줄엔 after(같은 레벨·타입). 새 줄 id 반환.
+   *  before=전체·after=''(줄 끝에서 Enter)면 기존 addAfter처럼 빈 줄 삽입과 동일. */
+  function splitThought(id: string, before: string, after: string): string | null {
+    if (state.thoughts.findIndex((t) => t.id === id) < 0) return null
+    const newId = newThoughtId()
+    update((s) => {
+      const i = s.thoughts.findIndex((t) => t.id === id)
+      if (i < 0) return s
+      const cur = s.thoughts[i]
+      const list = [...s.thoughts]
+      list[i] = { ...cur, text: before }
+      list.splice(i + 1, 0, { id: newId, type: cur.type, level: cur.level, text: after, done: false })
+      return { ...s, thoughts: list }
+    })
+    setFocusRequest(newId)
+    return newId
+  }
+
   /** id 줄 바로 아래에 같은 레벨·타입 새 줄 삽입, 새 줄 id 반환 */
   function addAfter(id: string): string | null {
     const idx = state.thoughts.findIndex((t) => t.id === id)
@@ -212,6 +230,7 @@ export function useTopicDetailState(topicId: string) {
     setText,
     cycleType,
     addAfter,
+    splitThought,
     addAtEnd,
     deleteThought,
     indent,

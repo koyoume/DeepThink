@@ -11,7 +11,7 @@ interface Props {
   onBlur: () => void
   onTextChange: (text: string) => void
   onCycleType: () => void
-  onEnter: () => void
+  onEnter: (before: string, after: string) => void
   onBackspaceAtStart: () => void
   onIndent: () => void
   onOutdent: () => void
@@ -25,6 +25,7 @@ interface Props {
 export function ThoughtRow(props: Props) {
   const { thought } = props
   const inputRef = useRef<HTMLTextAreaElement | null>(null)
+  const caretToEndRef = useRef(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const [focused, setFocused] = useState(false)
 
@@ -44,10 +45,18 @@ export function ThoughtRow(props: Props) {
   }, [props.focusRequested, onFocusHandled])
 
   // 렌더 뷰(blur 상태)를 클릭해 편집 모드로 전환할 때, input이 막 마운트된 뒤 포커스를 옮긴다.
+  // 뷰를 탭해 들어온 경우(caretToEndRef)엔 커서를 줄 맨 끝에 둔다(기본값은 맨 앞이라 수정이 불편).
+  // 새 줄/분리(focusRequested)로 들어온 경우엔 맨 앞(0)에 두어 이어지는 텍스트 앞에서 타이핑하게 한다.
   useEffect(() => {
     if (focused) {
-      inputRef.current?.focus()
-      autoResize(inputRef.current)
+      const el = inputRef.current
+      el?.focus()
+      if (el && caretToEndRef.current) {
+        const len = el.value.length
+        el.setSelectionRange(len, len)
+      }
+      caretToEndRef.current = false
+      autoResize(el)
     }
   }, [focused])
 
@@ -69,7 +78,10 @@ export function ThoughtRow(props: Props) {
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
     if (e.key === 'Enter') {
       e.preventDefault()
-      props.onEnter()
+      const el = e.currentTarget
+      const before = el.value.slice(0, el.selectionStart)
+      const after = el.value.slice(el.selectionEnd)
+      props.onEnter(before, after)
     } else if (e.key === 'Backspace') {
       const el = e.currentTarget
       if (el.selectionStart === 0 && el.selectionEnd === 0) {
@@ -99,7 +111,10 @@ export function ThoughtRow(props: Props) {
         <button
           type="button"
           data-testid="thought-view"
-          onClick={() => setFocused(true)}
+          onClick={() => {
+            caretToEndRef.current = true
+            setFocused(true)
+          }}
           className={`min-w-0 flex-1 whitespace-normal break-words bg-transparent text-left text-sm outline-none ${
             thought.type === 'check' && thought.done ? 'text-faint line-through' : 'text-ink'
           }`}

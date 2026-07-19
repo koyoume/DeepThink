@@ -256,6 +256,12 @@ interface Category {
 - **동작**: 마운트(접속) 및 선택 카테고리 변경 시, 선택된 칩이 칩 행 가운데로 오도록 **칩 행만** 가로 스크롤한다. `selectedRef`(활성 칩 래퍼)와 `scrollRef`(스크롤 컨테이너)의 `getBoundingClientRect` 차이로 `scrollLeft`를 보정 — 컨테이너 `position` 설정과 무관하고, 페이지 세로 스크롤엔 영향 없음(칩 컨테이너 `scrollLeft`만 조정, 브라우저가 `[0, maxScroll]`로 자동 클램프).
 - **범위**: `CategoryChips.tsx`만 수정. 선택 상태 영속화(§5.2 `localStorage`)와 맞물려, 새로고침 후 복원된 선택 카테고리도 접속 즉시 화면에 보이게 됨.
 
+## 5.9 편집 진입 커서 위치 + 커서 기준 엔터 줄 분리 (2026-07-19, 17차 수정)
+글쓰기 화면 커서 관련 버그 2건.
+
+- **(1) 편집 진입 시 커서가 줄 맨 앞으로 감**: 렌더 뷰(blur 상태 `<button>`)를 눌러 편집 모드로 전환하면 새로 마운트된 `<textarea>`에 `.focus()`만 하고 커서 위치를 지정하지 않아 기본값(맨 앞, 위치 0)에 놓였다 → 기존 글을 수정하려면 매번 커서를 끝으로 옮겨야 했음. 수정: 뷰를 탭해 들어온 경우엔 포커스 후 `setSelectionRange(len, len)`으로 커서를 줄 맨 끝에 둔다. 뷰 버튼 onClick에서 `caretToEndRef`를 세우고 `focused` 이펙트에서 이 플래그일 때만 끝으로 이동(플래그는 즉시 리셋). 새 줄/분리로 들어온 경우(`focusRequested`)는 플래그가 없어 맨 앞(0)에 남아, 이어지는 텍스트 앞에서 바로 타이핑됨.
+- **(2) 줄 중간에서 Enter가 빈 줄만 만듦**: 기존 `onEnter`는 커서 위치를 무시하고 `addAfter`로 빈 줄만 삽입해, 커서 뒤 텍스트가 다음 줄로 넘어가지 않았음. 수정: `ThoughtRow`의 Enter 핸들러가 `selectionStart/End` 기준으로 `before = value.slice(0, start)`, `after = value.slice(end)`를 계산해 `onEnter(before, after)`로 전달. 상태 훅에 `splitThought(id, before, after)` 신설 — 현재 줄 텍스트를 `before`로 바꾸고 바로 아래에 `after`를 담은 같은 레벨·타입 새 줄을 삽입한 뒤 그 줄에 포커스(맨 앞). 한 번의 `update`로 원자적 처리(텍스트 변경+삽입 동시). 줄 **끝**에서 Enter면 `before`=전체·`after`=''이라 기존 빈 줄 삽입과 동일(E2E `End`+`Enter` 흐름 호환). 기존 `addAfter`는 훅 API로 유지.
+
 ## 6. 비기능 요구
 - 반응형: 데스크톱/모바일 브라우저 모두 대응(원본은 모바일 전용이었으나 웹은 양쪽 지원).
 - 편집 후 400ms debounce 저장 (원본 `TopicDetailViewModel.scheduleSave` 동일 패턴).
