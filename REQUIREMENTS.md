@@ -70,6 +70,12 @@ interface Category {
 - git 동기화는 **카테고리별로 해당 md 파일 1개만** add/commit/push — repo의 다른 파일은 절대 건드리지 않음(원본 불변 조건 유지).
 - **PAT 저장**: `localStorage`에 평문 저장(remoteUrl/username/token/authorName/authorEmail). Android의 EncryptedSharedPreferences 같은 안전한 저장소가 브라우저엔 없음 — 개인용 도구라는 전제 하의 의도적 트레이드오프. **정정 여지**: 나중에 passphrase 기반 Web Crypto 암호화를 추가할 수 있음(현재 범위 아님).
 - **CORS 프록시**: git 호스트가 브라우저 CORS를 지원하지 않아 Cloudflare Worker로 투명 프록시 필요(git 로직에 관여하지 않는 순수 바이트 릴레이).
+- **자동 병합 (2026-07-05, 14차 수정)**: 웹앱이 기본 편집 경로지만, 다른 경로(GitHub 웹, 다른 기기의 git clone 등)로 repo를 직접 고칠 수도 있다는 전제 하에, "설정 > 동기화"를 누르면(개별 카테고리 동기화 버튼이든 Pull이든) **항상 자동으로 병합**되어야 하고 사용자에게 충돌 해결 화면을 절대 띄우지 않는다.
+  - 병합 단위는 카테고리 md 파일의 **줄(=대부분 생각 한 줄) 단위 3-way 병합**(`diff3` 알고리즘). Thought.id는 파일에 저장되지 않고 파싱 때마다 새로 생성되는 값이라(§8) ID 기반 병합 대상 자체가 없고, 파일을 그대로 줄 단위로 병합하는 것이 곧 "생각 단위 병합"과 동일한 효과.
+  - 진짜 충돌(같은 줄을 로컬·원격이 서로 다르게 고친 경우)도 사용자에게 묻지 않고 **자동으로 둘 다 보존**한다: 원격(remote) 버전을 유지하고, 로컬에서 다르게 고친 버전을 바로 아래 줄에 이어붙인다. 데이터 유실은 없지만, 결과적으로 그 생각이 두 줄로 보일 수 있음(사용자가 다시 정리 가능).
+  - 구현: isomorphic-git `merge()`의 `mergeDriver` 옵션에 커스텀 `silentMergeDriver`(`src/git/silentMergeDriver.ts`)를 꽂아 항상 `cleanMerge:true`를 반환 — 기본 mergeDriver(`<<<<<<<` 충돌 마커 삽입 후 `cleanMerge:false`)를 대체. `pull()`은 기존처럼 우선 fast-forward만 시도하고, `Errors.FastForwardError`가 나면 이 mergeDriver로 실제 3-way 병합을 수행(`mergeWithRemote` 헬퍼로 공통화). `syncCategory()`는 push가 (isomorphic-git이 `{ok:false}`가 아니라 **`Errors.PushRejectedError` 예외**로 던지는 점에 주의) non-fast-forward로 거부되면 자동으로 fetch+병합 후 재push하며, 레이스 대비 최대 3회까지 재시도.
+  - 병합으로 파일 내용이 바뀔 수 있어(원격의 다른 변경, 또는 충돌 해소로 인한 줄 추가), `syncCategoryGit`도 `pullGit`처럼 성공 시 항상 vault를 다시 읽어(reload) 화면에 반영.
+  - **검증**: `src/git/__verify__/autoMerge.mjs` — 로컬 smart-HTTP 서버(외부 네트워크 불필요) 위에서 "앱 세션이 한 줄을 고치는 동안, 순수 git CLI로 저장소를 직접 clone/edit/push해 같은 줄을 다르게 고친" 상황을 재현해, `syncCategory()` 한 번 호출로 충돌 화면 없이 자동 병합되고 두 문장이 모두 유실 없이 원격에 남는지, 충돌 마커가 전혀 없는지 확인. `npm run verify:domain`에 포함.
 
 ## 5. 화면/기능별 스펙
 `docs/legacy-prototype/UI-DESIGN.md` §4~6 동작 스펙을 그대로 따름(시각 디자인은 새로 함):

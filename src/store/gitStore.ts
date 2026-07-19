@@ -90,6 +90,9 @@ export const useGitStore = create<GitState>((set, get) => ({
     set({ busy: true, syncingCategory: name })
     const relative = vaultFileStore.relativePath(vaultFileStore.categoryFile(name))
     const result = await syncCategory(gitDeps(get().corsProxy), REPO_DIR, get().gitConfig, relative, `update ${name}`)
+    // 자동 병합으로 다른 곳의 변경 사항(같은 카테고리 또는 무관한 카테고리 파일)이 로컬에 반영됐을 수 있어
+    // 항상 vault를 다시 읽어 화면 상태를 최신화한다.
+    if (result.ok) await useVaultStore.getState().reload()
     const message = result.ok ? `[${name}] ${result.message}` : `[${name}] 오류: ${result.message}`
     set({ busy: false, syncingCategory: null, message })
   },

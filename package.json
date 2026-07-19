@@ -8,7 +8,7 @@
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview",
-    "verify:domain": "node src/domain/__verify__/cases.mjs && node src/domain/__verify__/vaultStore.mjs && node src/git/__verify__/regressionIsolation.mjs",
+    "verify:domain": "node src/domain/__verify__/cases.mjs && node src/domain/__verify__/vaultStore.mjs && node src/git/__verify__/regressionIsolation.mjs && node src/git/__verify__/autoMerge.mjs",
     "verify:git": "node src/git/__verify__/liveSync.mjs",
     "test:e2e": "playwright test"
   },
@@ -16,6 +16,7 @@
     "@isomorphic-git/lightning-fs": "^4.6.2",
     "@tailwindcss/vite": "^4.3.2",
     "buffer": "^6.0.3",
+    "diff3": "^0.0.3",
     "isomorphic-git": "^1.38.6",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
