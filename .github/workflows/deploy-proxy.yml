@@ -1,9 +1,15 @@
-name: Deploy Git CORS Proxy
+# ⚠️ 이관됨 — 이 워크플로는 비활성화되어 있다 (2026-08-17)
+#
+# 이 코드베이스는 koyoume/toolsmith 의 tools/deepthink/ 로 스냅샷 이관됐고,
+# 배포는 그쪽 워크플로가 담당한다:
+#   .github/workflows/deepthink-deploy-proxy.yml
+#
+# **두 repo가 같은 Cloudflare 대상(Worker deepthink-git-proxy)을 향하므로 둘 다 켜 두면 서로 덮어쓴다.**
+# 그래서 자동 트리거(on.push)를 지우고 수동 실행만 남겼다. 파일은 되돌리기 쉽게 보존한다.
+# 이 디렉터리는 스냅샷이며 더 이상 갱신되지 않는다.
+
+name: '[DISABLED — moved to toolsmith] Deploy Git CORS Proxy'
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'proxy/**'
   workflow_dispatch: {}
 
 jobs:

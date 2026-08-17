@@ -1,3 +1,19 @@
+> # ⚠️ 이 저장소는 이관됐다 (2026-08-17)
+>
+> 웹 코드베이스는 **[koyoume/toolsmith](https://github.com/koyoume/toolsmith)**의
+> `tools/deepthink/`로 스냅샷 이관됐다. 개발·배포는 전부 그쪽에서 한다.
+>
+> - 코드: `tools/deepthink/app/`
+> - 문서: `tools/deepthink/docs/` (REQUIREMENTS · DESIGN · BACKLOG · STATE)
+> - 배포: toolsmith의 `deepthink-deploy-web.yml` → 같은 Pages 프로젝트(`deepthink`), URL 그대로
+>
+> **여기 있는 코드는 스냅샷이며 더 이상 갱신되지 않는다.** 워크플로는 수동 실행만 남겨 뒀다
+> — 두 repo가 같은 Cloudflare 대상을 향하므로 둘 다 켜 두면 서로 덮어쓴다.
+>
+> 이관하지 않고 **여기에 남긴 것**(원본 repo가 정본):
+> `android-backup/`(Android 원본 — 도메인 동작의 정본 참고처), `docs/`(레거시 프로토타입),
+> `PLAN.md` · `REQUIREMENTS.md` · `WEB_DEV_GUIDE.md`(이관 전 문서), 커밋 히스토리.
+
 # DeepThink
 
 > 한 줄 = 하나의 생각. 카테고리 → 주제 → 생각(줄) 구조로 사색을 쌓는 모바일 우선 웹앱.
